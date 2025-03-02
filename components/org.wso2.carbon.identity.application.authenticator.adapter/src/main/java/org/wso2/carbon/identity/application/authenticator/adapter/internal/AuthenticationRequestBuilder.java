@@ -83,7 +83,7 @@ public class AuthenticationRequestBuilder implements ActionExecutionRequestBuild
 
     private Event getEvent(AuthenticationContext context) throws ActionExecutionRequestBuilderException {
 
-        AuthenticatedUser currentAuthenticatedUser = context.getSubject();
+        AuthenticatedUser currentAuthenticatedUser = context.getLastAuthenticatedUser();
         String tenantDomain = context.getTenantDomain();
 
         AuthenticationRequestEvent.Builder eventBuilder = new AuthenticationRequestEvent.Builder();

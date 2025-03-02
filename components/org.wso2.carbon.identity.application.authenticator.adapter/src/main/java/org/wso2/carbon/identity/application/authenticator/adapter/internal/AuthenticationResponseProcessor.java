@@ -83,6 +83,7 @@ public class AuthenticationResponseProcessor implements ActionExecutionResponseP
                 AuthenticatorAdapterConstants.AUTH_TYPE, AuthenticatorPropertyConstants.AuthenticationType.class);
 
         if (AuthenticatorPropertyConstants.AuthenticationType.VERIFICATION.equals(authType)) {
+            context.setSubject(context.getLastAuthenticatedUser());
             return new SuccessStatus.Builder().setResponseContext(flowContext.getContextData()).build();
         }
 
