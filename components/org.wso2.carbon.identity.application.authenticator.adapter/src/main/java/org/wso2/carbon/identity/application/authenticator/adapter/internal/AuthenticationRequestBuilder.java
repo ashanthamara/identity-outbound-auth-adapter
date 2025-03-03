@@ -44,7 +44,9 @@ import org.wso2.carbon.identity.application.authenticator.adapter.internal.model
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.model.AuthenticationRequestEvent;
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.model.AuthenticationRequestEvent.AuthenticatedStep;
 import org.wso2.carbon.identity.core.util.IdentityTenantUtil;
+import org.wso2.carbon.identity.organization.management.service.OrganizationManager;
 import org.wso2.carbon.identity.organization.management.service.exception.OrganizationManagementException;
+import org.wso2.carbon.identity.organization.management.service.util.OrganizationManagementUtil;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -57,6 +59,9 @@ import java.util.List;
 public class AuthenticationRequestBuilder implements ActionExecutionRequestBuilder {
 
     private static final Log LOG = LogFactory.getLog(AuthenticationRequestBuilder.class);
+
+    private static final OrganizationManager organizationManager = AuthenticatorAdapterDataHolder.getInstance()
+            .getOrganizationManager();
 
     @Override
     public ActionType getSupportedActionType() {
@@ -84,13 +89,11 @@ public class AuthenticationRequestBuilder implements ActionExecutionRequestBuild
     private Event getEvent(AuthenticationContext context) throws ActionExecutionRequestBuilderException {
 
         AuthenticatedUser currentAuthenticatedUser = context.getLastAuthenticatedUser();
-        String tenantDomain = context.getTenantDomain();
 
         AuthenticationRequestEvent.Builder eventBuilder = new AuthenticationRequestEvent.Builder();
-        eventBuilder.tenant(new Tenant(String.valueOf(IdentityTenantUtil.getTenantId(tenantDomain)), tenantDomain));
+        setTenantAndOrganizationToEventBuilder(eventBuilder, context);
         if (currentAuthenticatedUser != null) {
             eventBuilder.user(getUserForEventBuilder(currentAuthenticatedUser));
-            eventBuilder.organization(getOrganizationForEventBuilder(currentAuthenticatedUser));
             eventBuilder.userStore(new UserStore(currentAuthenticatedUser.getUserStoreDomain()));
         }
         eventBuilder.application(new Application(context.getServiceProviderResourceId(),
@@ -110,23 +113,32 @@ public class AuthenticationRequestBuilder implements ActionExecutionRequestBuild
         }
     }
 
-    private Organization getOrganizationForEventBuilder(AuthenticatedUser authenticatedUser) {
+    private void setTenantAndOrganizationToEventBuilder(AuthenticationRequestEvent.Builder eventBuilder,
+                                                        AuthenticationContext context)
+            throws ActionExecutionRequestBuilderException {
 
-        String organizationId = authenticatedUser.getUserResidentOrganization();
+        String tenantDomain = context.getTenantDomain();
+
         try {
-            if (organizationId != null && !organizationId.isEmpty()) {
-                String organizationName = AuthenticatorAdapterDataHolder.getInstance().getOrganizationManager()
-                        .getOrganizationNameById(authenticatedUser.getUserResidentOrganization());
-                return new Organization(authenticatedUser.getUserResidentOrganization(), organizationName);
+            /* Only if the user is attempting to log in to a sub-organization, the organization will be set,
+             and also the root tenant will be considered the tenant domain. */
+            if (OrganizationManagementUtil.isOrganization(tenantDomain)) {
+                String orgId = organizationManager.resolveOrganizationId(tenantDomain);
+                eventBuilder.organization(new Organization(
+                        orgId,
+                        organizationManager.getOrganizationNameById(orgId)
+                ));
+                tenantDomain = OrganizationManagementUtil.getRootOrgTenantDomainBySubOrgTenantDomain(orgId);
             }
         } catch (OrganizationManagementException e) {
-            LOG.debug("Error occurred while retrieving organization name of the authorized user: " + organizationId, e);
-            return null;
+            throw new ActionExecutionRequestBuilderException(String.format("Error occurred while retrieving " +
+                    "organization details for the tenant %s in authentication context.", tenantDomain), e);
         }
 
-        LOG.debug("The organization id is not set for the authorized user with username: "
-                + authenticatedUser.getUserName());
-        return null;
+        eventBuilder.tenant(new Tenant(
+                String.valueOf(IdentityTenantUtil.getTenantId(tenantDomain)),
+                tenantDomain
+        ));
     }
 
     private AuthenticatedStep[] getAuthenticatedStepsForEventBuilder(AuthenticationContext context) {
