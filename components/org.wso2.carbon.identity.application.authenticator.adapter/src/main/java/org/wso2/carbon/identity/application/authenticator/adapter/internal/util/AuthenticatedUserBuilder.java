@@ -40,6 +40,7 @@ import org.wso2.carbon.user.core.UserRealm;
 import org.wso2.carbon.user.core.common.AbstractUserStoreManager;
 import org.wso2.carbon.user.core.common.User;
 import org.wso2.carbon.user.core.service.RealmService;
+import org.wso2.carbon.user.core.util.UserCoreUtil;
 
 import java.util.HashMap;
 import java.util.List;
@@ -280,6 +281,7 @@ public class AuthenticatedUserBuilder {
             } else {
                 userStoreDomainName = getDefaultUserStore();
             }
+            UserCoreUtil.setDomainInThreadLocal(userStoreDomainName);
             userStoreManager = (AbstractUserStoreManager) userRealm.getUserStoreManager()
                     .getSecondaryUserStoreManager(userStoreDomainName);
         } catch (UserStoreException e) {
