@@ -28,7 +28,7 @@
     <groupId>org.wso2.carbon.identity.outbound.auth.adapter</groupId>
     <modelVersion>4.0.0</modelVersion>
     <artifactId>identity-outbound-auth-adapter</artifactId>
-    <version>1.0.18</version>
+    <version>1.0.19-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>WSO2 Identity - Application Authenticator Adapter for external authentication service</name>
     <description>
@@ -41,7 +41,7 @@
         <developerConnection>scm:git:https://github.com/wso2-extensions/identity-outbound-auth-adapter.git
         </developerConnection>
         <connection>scm:git:https://github.com/wso2-extensions/identity-outbound-auth-adapter.git</connection>
-        <tag>v1.0.18</tag>
+        <tag>HEAD</tag>
     </scm>
 
     <dependencyManagement>
