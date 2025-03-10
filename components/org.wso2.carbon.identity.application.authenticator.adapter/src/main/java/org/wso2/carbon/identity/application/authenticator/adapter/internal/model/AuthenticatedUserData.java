@@ -6,6 +6,8 @@ import org.wso2.carbon.identity.action.execution.api.model.ResponseData;
 
 import java.util.List;
 
+import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.MULTI_ATTR_SEPARATOR;
+
 /**
  * This class holds the data of the authenticated user, which are presented in response from the external
  * authentication service.
@@ -85,7 +87,7 @@ public class AuthenticatedUserData implements ResponseData {
         private String uri;
 
         @JsonProperty("value")
-        private String value;
+        private Object value;
 
         public Claim() {
         }
@@ -93,7 +95,7 @@ public class AuthenticatedUserData implements ResponseData {
         @JsonCreator
         public Claim(
                 @JsonProperty("uri") String uri,
-                @JsonProperty("value") String value) {
+                @JsonProperty("value") Object value) {
             this.uri = uri;
             this.value = value;
         }
@@ -103,7 +105,11 @@ public class AuthenticatedUserData implements ResponseData {
         }
 
         public String getValue() {
-            return value;
+
+            if (value instanceof List) {
+                return String.join(MULTI_ATTR_SEPARATOR, (List<String>) value);
+            }
+            return (String) value;
         }
     }
 
