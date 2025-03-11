@@ -47,9 +47,11 @@ import java.util.List;
 import java.util.Map;
 
 import static org.wso2.carbon.identity.application.authentication.framework.util.FrameworkConstants.LOCAL;
+import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.ADDRESS_CLAIM;
 import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.DEFAULT_USER_STORE_CONFIG_PATH;
 import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.EXTERNAL_ID_CLAIM;
 import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.GROUP_CLAIM;
+import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.ROLES_CLAIM;
 import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.USERNAME_CLAIM;
 
 /**
@@ -179,20 +181,52 @@ public class AuthenticatedUserBuilder {
         throw new ActionExecutionResponseProcessorException(errorMessage);
     }
 
-    private Map<ClaimMapping, String> resolveUserNameAndClaimsFromResponse() {
+    private Map<ClaimMapping, String> resolveUserNameAndClaimsFromResponse()
+            throws ActionExecutionResponseProcessorException {
 
         Map<ClaimMapping, String> userAttributes = new HashMap<>();
         for (AuthenticatedUserData.Claim claim : userFromResponse.getUser().getClaims()) {
+            validateClaimValue(claim.getUri(), claim.getValue());
             if (GROUP_CLAIM.equals(claim.getUri())) {
                 ignoreGroupsInClaimsInResponse();
                 continue;
+            } else if (ROLES_CLAIM.equals(claim.getUri())) {
+                continue;
             }
-            userAttributes.put(buildClaimMapping(claim.getUri()), claim.getValue());
+            userAttributes.put(buildClaimMapping(claim.getUri()), claim.getValueAsString());
             if (USERNAME_CLAIM.equals(claim.getUri())) {
-                usernameFromResponse = claim.getValue();
+                usernameFromResponse = claim.getValueAsString();
             }
         }
         return userAttributes;
+    }
+
+    private void validateClaimValue(String claimUri, Object claimValue)
+            throws ActionExecutionResponseProcessorException {
+
+        if (ADDRESS_CLAIM.equals(claimUri)) {
+            return;
+        }
+
+        if (claimValue instanceof List) {
+            for (String value : (List<String>) claimValue) {
+                validateMultiAttributeSeparatorContainsInValue(value);
+            }
+        } else {
+            validateMultiAttributeSeparatorContainsInValue((String) claimValue);
+        }
+    }
+
+    private void validateMultiAttributeSeparatorContainsInValue(String value)
+            throws ActionExecutionResponseProcessorException {
+
+        if (StringUtils.contains(value, FrameworkUtils.getMultiAttributeSeparator())) {
+            String errorMessage = String.format("The character %s is not allowed in claim values, as it is " +
+                    "used internally to separate multiple values.", FrameworkUtils.getMultiAttributeSeparator());
+            DiagnosticLogger.logSuccessResponseDataValidationError(new AuthenticationActionExecutionResult(
+                    "claims", Availability.AVAILABLE, Validity.INVALID, errorMessage));
+            throw new ActionExecutionResponseProcessorException(errorMessage);
+        }
     }
 
     private void resolveGroupsForFederatedUser(Map<ClaimMapping, String> claimMappings)

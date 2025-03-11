@@ -104,7 +104,12 @@ public class AuthenticatedUserData implements ResponseData {
             return uri;
         }
 
-        public String getValue() {
+        public Object getValue() {
+
+            return value;
+        }
+
+        public String getValueAsString() {
 
             if (value instanceof List) {
                 return String.join(MULTI_ATTR_SEPARATOR, (List<String>) value);

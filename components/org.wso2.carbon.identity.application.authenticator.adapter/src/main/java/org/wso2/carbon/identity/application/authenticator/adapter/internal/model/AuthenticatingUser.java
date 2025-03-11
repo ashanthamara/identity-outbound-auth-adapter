@@ -26,10 +26,12 @@ import org.wso2.carbon.identity.application.authenticator.adapter.internal.const
 import org.wso2.carbon.identity.application.common.model.ClaimMapping;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.ADDRESS_CLAIM;
 import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.MULTI_ATTR_SEPARATOR;
 
 /**
@@ -39,39 +41,46 @@ public class AuthenticatingUser extends User {
 
     private String userIdentitySource;
     private String sub;
-    private final List<UserClaim> claims = new ArrayList<>();
-
-    public static final String ADDRESS = "address";
-    public static final String GROUPS = "groups";
-
-    public AuthenticatingUser(String id) {
-        super(id);
-    }
 
     public AuthenticatingUser(String id, AuthenticatedUser user) {
-        super(id);
+
+        super(buildUser(id, user));
         sub = user.getAuthenticatedSubjectIdentifier();
         userIdentitySource = user.isFederatedUser() ?
                 AuthenticatorAdapterConstants.FED_IDP : AuthenticatorAdapterConstants.LOCAL_IDP;
+    }
+
+    private static User.Builder buildUser(String id, AuthenticatedUser user) {
+
+        User.Builder userBuilder = new User.Builder(id);
 
         Map<ClaimMapping, String> userAttributes = user.getUserAttributes();
+        List<UserClaim> userClaimList = new ArrayList<>();
         if (userAttributes != null) {
             for (Map.Entry<ClaimMapping, String> entry : userAttributes.entrySet()) {
                 String claimUri = entry.getKey().getLocalClaim().getClaimUri();
+                if (claimUri.equals(AuthenticatorAdapterConstants.GROUP_CLAIM)) {
+                    userBuilder.groups(Arrays.asList(entry.getValue().split(Pattern.quote(MULTI_ATTR_SEPARATOR))));
+                    continue;
+                } else if (claimUri.equals(AuthenticatorAdapterConstants.ROLES_CLAIM)) {
+                    /* Since we are not supporting role management with the custom authenticator in the initial phase,
+                     we are ignoring it. */
+                    continue;
+                }
+
                 String claimValue = entry.getValue();
                 if (isMultiValuedAttribute(claimUri, claimValue)) {
                     String[] attributeValues = claimValue.split(Pattern.quote(MULTI_ATTR_SEPARATOR));
-                    claims.add(new UserClaim(claimUri, attributeValues));
+                    userClaimList.add(new UserClaim(claimUri, attributeValues));
                     continue;
                 }
-                claims.add(new UserClaim(claimUri, claimValue));
+                userClaimList.add(new UserClaim(claimUri, claimValue));
             }
         }
+        userBuilder.claims(userClaimList);
+        return userBuilder;
     }
 
-    public List<UserClaim> getClaims() {
-        return claims;
-    }
 
     public void setUserIdentitySource(String userIdentitySource) {
         this.userIdentitySource = userIdentitySource;
@@ -89,16 +98,11 @@ public class AuthenticatingUser extends User {
         return sub;
     }
 
-    private boolean isMultiValuedAttribute(String claimKey, String claimValue) {
+    private static boolean isMultiValuedAttribute(String claimKey, String claimValue) {
 
         // Address claim contains multi attribute separator but its not a multi valued attribute.
-        if (claimKey.equals(ADDRESS)) {
+        if (claimKey.equals(ADDRESS_CLAIM)) {
             return false;
-        }
-        // To format the groups claim to always return as an array, we should consider single group as
-        // multi value attribute.
-        if (claimKey.equals(GROUPS)) {
-            return true;
         }
         return StringUtils.contains(claimValue, MULTI_ATTR_SEPARATOR);
     }

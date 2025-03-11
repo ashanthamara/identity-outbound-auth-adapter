@@ -32,7 +32,10 @@ import org.wso2.carbon.identity.application.authenticator.adapter.internal.model
 import org.wso2.carbon.identity.application.authenticator.adapter.util.TestAuthenticationAdapterConstants.AuthenticatingUserConstants;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+
+import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.ADDRESS_CLAIM;
 
 public class TestActionInvocationResponseBuilder {
 
@@ -100,7 +103,6 @@ public class TestActionInvocationResponseBuilder {
 
     public static class ExternallyAuthenticatedUser extends AuthenticatedUserData.User {
 
-        AuthenticatedUserData.Claim claim1 = new AuthenticatedUserData.Claim("claim-1", "value-1");
         AuthenticatedUserData.Claim  userNameClaim = new AuthenticatedUserData.Claim(
                 AuthenticatorAdapterConstants.USERNAME_CLAIM, AuthenticatingUserConstants.USERNAME);
 
@@ -115,7 +117,7 @@ public class TestActionInvocationResponseBuilder {
             userStore = new AuthenticatedUserData.UserStore(
                     AuthenticatingUserConstants.USER_STORE_ID, AuthenticatingUserConstants.USER_STORE_NAME);
             groups = new ArrayList<>();
-            claims = new ArrayList<>(List.of(claim1, userNameClaim));
+            claims = buildUserClaims();
         }
 
         public void setId(String id) {
@@ -162,6 +164,18 @@ public class TestActionInvocationResponseBuilder {
 
             claims.removeIf(claim -> AuthenticatorAdapterConstants.USERNAME_CLAIM.equals(claim.getUri()));
             claims.add(new AuthenticatedUserData.Claim(AuthenticatorAdapterConstants.USERNAME_CLAIM, userName));
+        }
+
+        private ArrayList<AuthenticatedUserData.Claim> buildUserClaims() {
+
+            return new ArrayList<>(List.of(
+                    userNameClaim,
+                    new AuthenticatedUserData.Claim(ADDRESS_CLAIM, AuthenticatingUserConstants.ADDRESS),
+                    new AuthenticatedUserData.Claim(
+                            AuthenticatingUserConstants.USER_CLAIM_URI, AuthenticatingUserConstants.USER_CLAIM_VALUE),
+                    new AuthenticatedUserData.Claim(AuthenticatingUserConstants.USER_MULTI_VALUE_CLAIM_URI,
+                            Arrays.asList(AuthenticatingUserConstants.USER_MULTI_CLAIM_VALUE
+                                    .split(AuthenticatingUserConstants.SEPARATOR)))));
         }
     }
 }

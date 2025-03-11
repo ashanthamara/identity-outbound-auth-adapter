@@ -57,7 +57,6 @@ import static org.wso2.carbon.base.MultitenantConstants.SUPER_TENANT_DOMAIN_NAME
 public class FederatedAuthenticatorAdapterTest {
 
     private static final String AUTHENTICATOR_NAME = "UserDefinedFederatedAuthenticator";
-    private static final String FRIENDLY_NAME = "Federated Authenticator Adapter";
     private UserDefinedFederatedAuthenticator userDefinedFederatedAuthenticator;
 
     private final HttpServletRequest request = mock(HttpServletRequest.class);
@@ -76,7 +75,6 @@ public class FederatedAuthenticatorAdapterTest {
 
         UserDefinedFederatedAuthenticatorConfig fedConfig = new UserDefinedFederatedAuthenticatorConfig();
         fedConfig.setName(AUTHENTICATOR_NAME);
-        fedConfig.setDisplayName(FRIENDLY_NAME);
         userDefinedFederatedAuthenticator = new UserDefinedFederatedAuthenticator(fedConfig);
 
         mockedActionExecutorService = mock(ActionExecutorService.class);
@@ -95,7 +93,7 @@ public class FederatedAuthenticatorAdapterTest {
     @Test
     public void testGetFriendlyName() {
 
-        Assert.assertEquals(userDefinedFederatedAuthenticator.getFriendlyName(), FRIENDLY_NAME);
+        Assert.assertEquals(userDefinedFederatedAuthenticator.getFriendlyName(), AUTHENTICATOR_NAME);
     }
 
     @Test
