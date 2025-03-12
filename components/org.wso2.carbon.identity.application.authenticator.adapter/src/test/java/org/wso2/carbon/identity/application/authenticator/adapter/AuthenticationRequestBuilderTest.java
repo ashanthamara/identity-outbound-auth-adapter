@@ -55,7 +55,6 @@ import org.wso2.carbon.identity.organization.management.service.exception.Organi
 import org.wso2.carbon.identity.organization.management.service.util.OrganizationManagementUtil;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -162,9 +161,6 @@ public class AuthenticationRequestBuilderTest {
                 userWithMultiValueClaims, SUPER_TENANT_DOMAIN_NAME, headers, parameters, authHistory);
         AuthenticationRequestEvent expectedEventWithMultiValueClaims =
                 getExpectedEvent(userWithMultiValueClaims, false);
-        Arrays.stream(USER_GROUP_VALUE.split(SEPARATOR)).forEach(group -> {
-            expectedEventWithMultiValueClaims.getUser().addGroup(group);
-        });
 
         return new Object[][]{
                 {flowContextForNoUser, getExpectedEvent(null, true), true},
