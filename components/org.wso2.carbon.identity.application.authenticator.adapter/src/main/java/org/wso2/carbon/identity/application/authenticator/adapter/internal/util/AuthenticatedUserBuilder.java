@@ -191,8 +191,10 @@ public class AuthenticatedUserBuilder {
                 ignoreGroupsInClaimsInResponse();
                 continue;
             } else if (ROLES_CLAIM.equals(claim.getUri())) {
-                /* Since we are not supporting role management with the custom authenticator in the initial phase,
-                 we are ignoring it. */
+                DiagnosticLogger.logSuccessResponseDataValidationError(new AuthenticationActionExecutionResult(
+                        "claims/" + ROLES_CLAIM, Availability.AVAILABLE, Validity.INVALID,
+                        "Currently we are not supporting role management with the custom authenticator, " +
+                                "hence ignoring role claim."));
                 continue;
             }
             userAttributes.put(buildClaimMapping(claim.getUri()), claim.getValueAsString());
