@@ -94,7 +94,15 @@ public class AuthenticatedUserData implements ResponseData {
         @JsonCreator
         public Claim(
                 @JsonProperty("uri") String uri,
-                @JsonProperty("value") Object value) {
+                @JsonProperty("value") String value) {
+            this.uri = uri;
+            this.value = value;
+        }
+
+        @JsonCreator
+        public Claim(
+                @JsonProperty("uri") String uri,
+                @JsonProperty("value") List<String> value) {
             this.uri = uri;
             this.value = value;
         }

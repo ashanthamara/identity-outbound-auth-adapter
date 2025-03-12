@@ -214,14 +214,14 @@ public class AuthenticatedUserBuilder {
 
         if (claimValue instanceof List) {
             for (String value : (List<String>) claimValue) {
-                validateMultiAttributeSeparatorContainsInValue(value);
+                validateIfValueContainsMultiAttributeSeparator(value);
             }
         } else {
-            validateMultiAttributeSeparatorContainsInValue((String) claimValue);
+            validateIfValueContainsMultiAttributeSeparator((String) claimValue);
         }
     }
 
-    private void validateMultiAttributeSeparatorContainsInValue(String value)
+    private void validateIfValueContainsMultiAttributeSeparator(String value)
             throws ActionExecutionResponseProcessorException {
 
         if (StringUtils.contains(value, FrameworkUtils.getMultiAttributeSeparator())) {
