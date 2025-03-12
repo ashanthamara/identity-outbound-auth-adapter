@@ -191,6 +191,8 @@ public class AuthenticatedUserBuilder {
                 ignoreGroupsInClaimsInResponse();
                 continue;
             } else if (ROLES_CLAIM.equals(claim.getUri())) {
+                /* Since we are not supporting role management with the custom authenticator in the initial phase,
+                 we are ignoring it. */
                 continue;
             }
             userAttributes.put(buildClaimMapping(claim.getUri()), claim.getValueAsString());
@@ -205,6 +207,8 @@ public class AuthenticatedUserBuilder {
             throws ActionExecutionResponseProcessorException {
 
         if (ADDRESS_CLAIM.equals(claimUri)) {
+            /* The ADDRESS claim is not validated for multi-value separator characters since it is internally treated
+             as a single-valued claim. */
             return;
         }
 

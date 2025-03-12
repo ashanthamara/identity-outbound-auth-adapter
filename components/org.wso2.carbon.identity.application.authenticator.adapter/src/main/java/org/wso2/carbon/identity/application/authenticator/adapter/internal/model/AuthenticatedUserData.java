@@ -3,10 +3,9 @@ package org.wso2.carbon.identity.application.authenticator.adapter.internal.mode
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.wso2.carbon.identity.action.execution.api.model.ResponseData;
+import org.wso2.carbon.identity.application.authentication.framework.util.FrameworkUtils;
 
 import java.util.List;
-
-import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.MULTI_ATTR_SEPARATOR;
 
 /**
  * This class holds the data of the authenticated user, which are presented in response from the external
@@ -112,7 +111,7 @@ public class AuthenticatedUserData implements ResponseData {
         public String getValueAsString() {
 
             if (value instanceof List) {
-                return String.join(MULTI_ATTR_SEPARATOR, (List<String>) value);
+                return String.join(FrameworkUtils.getMultiAttributeSeparator(), (List<String>) value);
             }
             return (String) value;
         }

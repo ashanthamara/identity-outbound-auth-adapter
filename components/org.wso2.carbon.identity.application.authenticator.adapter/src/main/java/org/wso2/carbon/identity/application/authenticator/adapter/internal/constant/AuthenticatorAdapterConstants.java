@@ -18,8 +18,6 @@
 
 package org.wso2.carbon.identity.application.authenticator.adapter.internal.constant;
 
-import org.wso2.carbon.identity.application.authentication.framework.util.FrameworkUtils;
-
 /**
  * This class holds the constants related to the authentication adapter.
  */
@@ -41,7 +39,6 @@ public class AuthenticatorAdapterConstants {
     public static final String LOCAL_IDP = "LOCAL";
     public static final String FED_IDP = "FEDERATED";
     public static final String EXECUTION_STATUS_PROP_NAME = "actionExecutionStatus";
-    public static final String MULTI_ATTR_SEPARATOR = FrameworkUtils.getMultiAttributeSeparator();
 
     public static final String DEFAULT_USER_STORE_CONFIG_PATH = "Actions.Types.Authentication.DefaultUserStore";
 
