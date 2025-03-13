@@ -18,6 +18,8 @@
 
 package org.wso2.carbon.identity.application.authenticator.adapter.util;
 
+import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.WSO2_CLAIM_DIALECT;
+
 /**
  * This class holds the constants related to the authentication adapter.
  */
@@ -29,6 +31,12 @@ public class TestAuthenticationAdapterConstants {
         public static final String USER_STORE_NAME = "testUserStore";
         public static final String USER_STORE_ID = "userStoreId";
         public static final String USERNAME = "TestUser";
+        public static final String USER_CLAIM_URI = WSO2_CLAIM_DIALECT + "/customUri";
+        public static final String USER_CLAIM_VALUE = "customValue";
+        public static final String USER_MULTI_VALUE_CLAIM_URI = WSO2_CLAIM_DIALECT + "/multiValueUri";
+        public static final String USER_MULTI_CLAIM_VALUE = "value1, value2";
+        public static final String ADDRESS = "5th Avenue, New York, USA";
+        public static final String SEPARATOR = ",";
     }
 
 }

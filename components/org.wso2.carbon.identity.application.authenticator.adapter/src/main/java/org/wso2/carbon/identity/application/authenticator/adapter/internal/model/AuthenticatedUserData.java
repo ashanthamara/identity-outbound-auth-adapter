@@ -3,6 +3,7 @@ package org.wso2.carbon.identity.application.authenticator.adapter.internal.mode
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.wso2.carbon.identity.action.execution.api.model.ResponseData;
+import org.wso2.carbon.identity.application.authentication.framework.util.FrameworkUtils;
 
 import java.util.List;
 
@@ -85,7 +86,7 @@ public class AuthenticatedUserData implements ResponseData {
         private String uri;
 
         @JsonProperty("value")
-        private String value;
+        private Object value;
 
         public Claim() {
         }
@@ -98,12 +99,29 @@ public class AuthenticatedUserData implements ResponseData {
             this.value = value;
         }
 
+        @JsonCreator
+        public Claim(
+                @JsonProperty("uri") String uri,
+                @JsonProperty("value") List<String> value) {
+            this.uri = uri;
+            this.value = value;
+        }
+
         public String getUri() {
             return uri;
         }
 
-        public String getValue() {
+        public Object getValue() {
+
             return value;
+        }
+
+        public String getValueAsString() {
+
+            if (value instanceof List) {
+                return String.join(FrameworkUtils.getMultiAttributeSeparator(), (List<String>) value);
+            }
+            return (String) value;
         }
     }
 

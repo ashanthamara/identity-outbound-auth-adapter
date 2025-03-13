@@ -34,9 +34,11 @@ import org.wso2.carbon.identity.action.execution.api.model.FlowContext;
 import org.wso2.carbon.identity.action.execution.api.model.Operation;
 import org.wso2.carbon.identity.action.execution.api.model.Organization;
 import org.wso2.carbon.identity.action.execution.api.model.Tenant;
+import org.wso2.carbon.identity.action.execution.api.model.UserClaim;
 import org.wso2.carbon.identity.application.authentication.framework.context.AuthHistory;
 import org.wso2.carbon.identity.application.authentication.framework.exception.UserIdNotFoundException;
 import org.wso2.carbon.identity.application.authentication.framework.model.AuthenticatedUser;
+import org.wso2.carbon.identity.application.authentication.framework.util.FrameworkUtils;
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.AuthenticationRequestBuilder;
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.component.AuthenticatorAdapterDataHolder;
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants;
@@ -44,6 +46,8 @@ import org.wso2.carbon.identity.application.authenticator.adapter.internal.model
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.model.AuthenticationRequestEvent;
 import org.wso2.carbon.identity.application.authenticator.adapter.util.TestAuthenticatedTestUserBuilder;
 import org.wso2.carbon.identity.application.authenticator.adapter.util.TestFlowContextBuilder;
+import org.wso2.carbon.identity.application.common.model.Claim;
+import org.wso2.carbon.identity.application.common.model.ClaimMapping;
 import org.wso2.carbon.identity.central.log.mgt.utils.LoggerUtils;
 import org.wso2.carbon.identity.core.util.IdentityTenantUtil;
 import org.wso2.carbon.identity.organization.management.service.OrganizationManager;
@@ -51,6 +55,7 @@ import org.wso2.carbon.identity.organization.management.service.exception.Organi
 import org.wso2.carbon.identity.organization.management.service.util.OrganizationManagementUtil;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -59,19 +64,30 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 import static org.wso2.carbon.base.MultitenantConstants.SUPER_TENANT_DOMAIN_NAME;
+import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.ADDRESS_CLAIM;
+import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.GROUP_CLAIM;
+import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.WSO2_CLAIM_DIALECT;
 import static org.wso2.carbon.identity.application.authenticator.adapter.util.TestAuthenticatedTestUserBuilder.AuthenticatedUserConstants;
 
 public class AuthenticationRequestBuilderTest {
 
     private AuthenticationRequestBuilder authenticationRequestBuilder;
     private MockedStatic<IdentityTenantUtil> identityTenantUtilMockedStatic;
+    private MockedStatic<FrameworkUtils> frameworkUtils;
     private MockedStatic<LoggerUtils> loggerUtils;
     private MockedStatic<OrganizationManagementUtil> organizationManagementUtil;
+    private static final String SEPARATOR = ",";
 
     private static final String TENANT_DOMAIN_TEST = "carbon.super";
     private static final int TENANT_ID_TEST = -1234;
     private static final String ORG_NAME_TEST = "subOrg";
     private static final String ORG_ID_TEST = "12345";
+    private static final String USER_CLAIM_URI = WSO2_CLAIM_DIALECT + "/customUri";
+    private static final String USER_CLAIM_VALUE = "customValue";
+    private static final String USER_MULTI_VALUE_CLAIM_URI = WSO2_CLAIM_DIALECT + "/multiValueUri";
+    private static final String USER_MULTI_CLAIM_VALUE = "value1, value2";
+    private static final String USER_GROUP_VALUE = "group1, group2";
+    private static final String ADDRESS = "5th Avenue, New York, USA";
     Map<String, String> headers = Map.of("header-1", "value-1", "header-2", "value-2");
     Map<String, String> parameters = Map.of("param-1", "value-1", "param-2", "value-2");
     ArrayList<AuthHistory> authHistory;
@@ -89,6 +105,8 @@ public class AuthenticationRequestBuilderTest {
         identityTenantUtilMockedStatic = mockStatic(IdentityTenantUtil.class);
         identityTenantUtilMockedStatic.when(() -> IdentityTenantUtil.getTenantId(TENANT_DOMAIN_TEST))
                 .thenReturn(TENANT_ID_TEST);
+        frameworkUtils = mockStatic(FrameworkUtils.class);
+        frameworkUtils.when(FrameworkUtils::getMultiAttributeSeparator).thenReturn(SEPARATOR);
 
         organizationManagementUtil = mockStatic(OrganizationManagementUtil.class);
         organizationManagementUtil.when(() ->
@@ -105,6 +123,7 @@ public class AuthenticationRequestBuilderTest {
     public void tearDown() {
 
         identityTenantUtilMockedStatic.close();
+        frameworkUtils.close();
         organizationManagementUtil.close();
         loggerUtils.close();
     }
@@ -132,7 +151,16 @@ public class AuthenticationRequestBuilderTest {
         AuthenticatedUser fedUser = TestAuthenticatedTestUserBuilder.createAuthenticatedUser(
                 AuthenticatedUserConstants.LOCAL_USER_PREFIX, SUPER_TENANT_DOMAIN_NAME);
         FlowContext flowContextForFedUser = new TestFlowContextBuilder().buildFlowContext(
-                fedUser, SUPER_TENANT_DOMAIN_NAME, headers, parameters, authHistory);;
+                fedUser, SUPER_TENANT_DOMAIN_NAME, headers, parameters, authHistory);
+
+        // Custom authenticator engaging in 2nd step of authentication flow with multi-value claims.
+        AuthenticatedUser userWithMultiValueClaims = TestAuthenticatedTestUserBuilder.createAuthenticatedUser(
+                AuthenticatedUserConstants.LOCAL_USER_PREFIX, SUPER_TENANT_DOMAIN_NAME);
+        userWithMultiValueClaims.setUserAttributes(buildUserAttributes());
+        FlowContext flowContextForUserWithMultiValueClaims = new TestFlowContextBuilder().buildFlowContext(
+                userWithMultiValueClaims, SUPER_TENANT_DOMAIN_NAME, headers, parameters, authHistory);
+        AuthenticationRequestEvent expectedEventWithMultiValueClaims =
+                getExpectedEvent(userWithMultiValueClaims, false);
 
         return new Object[][]{
                 {flowContextForNoUser, getExpectedEvent(null, true), true},
@@ -140,7 +168,8 @@ public class AuthenticationRequestBuilderTest {
                 {flowContextForLocalUser, getExpectedEvent(localUser, true), true},
                 {flowContextForLocalUser, getExpectedEvent(localUser, false), false},
                 {flowContextForFedUser, getExpectedEvent(fedUser, true), true},
-                {flowContextForFedUser, getExpectedEvent(fedUser, false), false}};
+                {flowContextForFedUser, getExpectedEvent(fedUser, false), false},
+                {flowContextForUserWithMultiValueClaims, expectedEventWithMultiValueClaims, false}};
     }
 
     @Test(dataProvider = "flowContextDataProvider")
@@ -185,6 +214,19 @@ public class AuthenticationRequestBuilderTest {
         Assert.assertEquals(actualAuthenticatingUser.getUserIdentitySource(), expectedUser.getUserIdentitySource());
         Assert.assertEquals(actualAuthenticatingUser.getSub(), expectedUser.getSub());
         Assert.assertEquals(actualAuthenticatingUser.getClaims().size(), expectedUser.getClaims().size());
+        if (!expectedUser.getClaims().isEmpty()) {
+            for (UserClaim claim : expectedUser.getClaims()) {
+                boolean claimFound = false;
+                for (UserClaim actualClaim : actualAuthenticatingUser.getClaims()) {
+                    if (claim.getUri().equals(actualClaim.getUri())) {
+                        Assert.assertEquals(actualClaim.getValue(), claim.getValue());
+                        claimFound = true;
+                        break;
+                    }
+                }
+                Assert.assertTrue(claimFound);
+            }
+        }
         if (expectedEvent.getOrganization() == null) {
             Assert.assertNull(actualAuthenticationEvent.getOrganization());
         } else {
@@ -222,7 +264,7 @@ public class AuthenticationRequestBuilderTest {
 
     private static AuthenticatingUser createAuthenticatingUser(AuthenticatedUser user) throws UserIdNotFoundException {
 
-        AuthenticatingUser authenticatingUser = new AuthenticatingUser(user.getUserId());
+        AuthenticatingUser authenticatingUser = new AuthenticatingUser(user.getUserId(), user);
         if (user.isFederatedUser()) {
             authenticatingUser.setUserIdentitySource(AuthenticatorAdapterConstants.FED_IDP);
         } else {
@@ -230,5 +272,25 @@ public class AuthenticationRequestBuilderTest {
         }
         authenticatingUser.setSub(user.getAuthenticatedSubjectIdentifier());
         return authenticatingUser;
+    }
+
+    private static Map<ClaimMapping, String> buildUserAttributes() {
+
+        Map<ClaimMapping, String> userAttributes = new HashMap<>();
+        userAttributes.put(buildClaimMapping(GROUP_CLAIM), USER_GROUP_VALUE);
+        userAttributes.put(buildClaimMapping(ADDRESS_CLAIM), ADDRESS);
+        userAttributes.put(buildClaimMapping(USER_MULTI_VALUE_CLAIM_URI), USER_MULTI_CLAIM_VALUE);
+        userAttributes.put(buildClaimMapping(USER_CLAIM_URI), USER_CLAIM_VALUE);
+        return userAttributes;
+    }
+
+    private static ClaimMapping buildClaimMapping(String claimUri) {
+
+        ClaimMapping claimMapping = new ClaimMapping();
+        Claim claim = new Claim();
+        claim.setClaimUri(claimUri);
+        claimMapping.setRemoteClaim(claim);
+        claimMapping.setLocalClaim(claim);
+        return claimMapping;
     }
 }

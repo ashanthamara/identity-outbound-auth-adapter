@@ -321,7 +321,7 @@
         </identity.application.auth.adapter.package.export.version>
 
         <servlet-api.version>2.5</servlet-api.version>
-        <carbon.identity.framework.version>7.8.3</carbon.identity.framework.version>
+        <carbon.identity.framework.version>7.8.58</carbon.identity.framework.version>
         <testng.version>7.10.1</testng.version>
         <maven.surefire.plugin.version>2.22.2</maven.surefire.plugin.version>
         <mockito.version>5.3.1</mockito.version>

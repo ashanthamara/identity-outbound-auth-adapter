@@ -57,6 +57,7 @@ import org.wso2.carbon.identity.application.authenticator.adapter.util.TestActio
 import org.wso2.carbon.identity.application.authenticator.adapter.util.TestAuthenticatedTestUserBuilder;
 import org.wso2.carbon.identity.application.authenticator.adapter.util.TestAuthenticationAdapterConstants.AuthenticatingUserConstants;
 import org.wso2.carbon.identity.application.authenticator.adapter.util.TestFlowContextBuilder;
+import org.wso2.carbon.identity.application.common.model.Claim;
 import org.wso2.carbon.identity.application.common.model.ClaimMapping;
 import org.wso2.carbon.identity.application.common.model.IdentityProvider;
 import org.wso2.carbon.identity.base.AuthenticatorPropertyConstants.AuthenticationType;
@@ -87,6 +88,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.wso2.carbon.base.MultitenantConstants.SUPER_TENANT_DOMAIN_NAME;
+import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.ADDRESS_CLAIM;
 import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.DEFAULT_USER_STORE_CONFIG_PATH;
 
 public class AuthenticationResponseProcessorTest {
@@ -94,6 +96,7 @@ public class AuthenticationResponseProcessorTest {
     private final HttpServletRequest request = spy(HttpServletRequest.class);
     private HttpServletResponse response = spy(HttpServletResponse.class);
     private static final String TENANT_DOMAIN_TEST = "carbon.super";
+    private static final String SEPARATOR = ",";
     private static final int TENANT_ID_TEST = -1234;
     private static ArrayList<AuthHistory> authHistory;
     private static IdentityProvider fedIdp;
@@ -139,6 +142,7 @@ public class AuthenticationResponseProcessorTest {
     public void tearDown() {
 
         identityTenantUtilMockedStatic.close();
+        frameworkUtils.close();
         identityConfigParser.close();
     }
 
@@ -479,11 +483,23 @@ public class AuthenticationResponseProcessorTest {
         String errorMessageForNoInvalidGroupName = String.format("The character %s is not allowed in names of groups," +
                 " as it is used internally to separate multiple groups.", FrameworkUtils.getMultiAttributeSeparator());
 
+        ExternallyAuthenticatedUser authUserWithInvalidMultiValueClaims = new ExternallyAuthenticatedUser();
+        authUserWithInvalidMultiValueClaims.setClaims(new ArrayList<>(
+                List.of(new AuthenticatedUserData.Claim("claim1", "value1, value2"))));
+        ActionExecutionResponseContext<ActionInvocationSuccessResponse> authSuccessResponseWithInvalidMultiValueClaims =
+                TestActionInvocationResponseBuilder.buildAuthenticationSuccessResponse(
+                        new ArrayList<>(), new AuthenticatedUserData(authUserWithInvalidMultiValueClaims));
+        String errorMessageForInvalidMultiValueClaims =
+                "The character , is not allowed in claim values, as it is used internally to separate multiple values.";
+
+
         return new Object[][] {
                 {authContextWithLocalUserFromFirstStep, authSuccessResponseWithoutUserId,
                         errorMessageForMissingUserId},
                 {authContextWithLocalUserFromFirstStep, authSuccessResponseWithInvalidGroupName,
-                        errorMessageForNoInvalidGroupName}
+                        errorMessageForNoInvalidGroupName},
+                {authContextWithLocalUserFromFirstStep, authSuccessResponseWithInvalidMultiValueClaims,
+                        errorMessageForInvalidMultiValueClaims}
         };
     }
 
@@ -586,7 +602,7 @@ public class AuthenticationResponseProcessorTest {
         loggerUtils.when(LoggerUtils::isDiagnosticLogsEnabled).thenReturn(true);
 
         frameworkUtils = mockStatic(FrameworkUtils.class);
-        frameworkUtils.when(FrameworkUtils::getMultiAttributeSeparator).thenReturn(",");
+        frameworkUtils.when(FrameworkUtils::getMultiAttributeSeparator).thenReturn(SEPARATOR);
 
         Map<String, Object> configMap = new HashMap<>();
         configMap.put(DEFAULT_USER_STORE_CONFIG_PATH, AuthenticatingUserConstants.USER_STORE_NAME);
@@ -611,9 +627,7 @@ public class AuthenticationResponseProcessorTest {
         userFromUserStore.setUsername(AuthenticatingUserConstants.USERNAME);
         userFromUserStore.setUserID(AuthenticatingUserConstants.USERID);
 
-        Map<ClaimMapping, String> claimsForLocalUser = new HashMap<>();
-        claimsForLocalUser.put(ClaimMapping.build("claim-1", "claim-1", null, false),
-                "value-1");
+        Map<ClaimMapping, String> claimsForLocalUser = expectedUserClaims();
         expectedLocalAuthenticatedUser = new AuthenticatedUser();
         expectedLocalAuthenticatedUser.setUserId(AuthenticatingUserConstants.USERID);
         expectedLocalAuthenticatedUser.setUserStoreDomain(AuthenticatingUserConstants.USER_STORE_NAME);
@@ -621,9 +635,7 @@ public class AuthenticationResponseProcessorTest {
         expectedLocalAuthenticatedUser.setTenantDomain(SUPER_TENANT_DOMAIN_NAME);
         expectedLocalAuthenticatedUser.setUserAttributes(claimsForLocalUser);
 
-        Map<ClaimMapping, String> claimsForFedUser = new HashMap<>();
-        claimsForFedUser.put(ClaimMapping.build("claim-1", "claim-1", "value-1", false),
-                "value-1");
+        Map<ClaimMapping, String> claimsForFedUser = expectedUserClaims();
         claimsForFedUser.put(ClaimMapping.build(AuthenticatorAdapterConstants.GROUP_CLAIM,
                         AuthenticatorAdapterConstants.GROUP_CLAIM, null, false),
                 String.join(",", groups));
@@ -642,10 +654,31 @@ public class AuthenticationResponseProcessorTest {
                 .thenReturn(expectedLocalAuthenticatedUser);
     }
 
+    private Map<ClaimMapping, String> expectedUserClaims() {
+
+        Map<ClaimMapping, String> expectedClaim = new HashMap<>();
+        expectedClaim.put(buildClaimMapping(ADDRESS_CLAIM), AuthenticatingUserConstants.ADDRESS);
+        expectedClaim.put(buildClaimMapping(AuthenticatingUserConstants.USER_CLAIM_URI),
+                AuthenticatingUserConstants.USER_CLAIM_VALUE);
+        expectedClaim.put(buildClaimMapping(AuthenticatingUserConstants.USER_MULTI_VALUE_CLAIM_URI),
+                AuthenticatingUserConstants.USER_MULTI_CLAIM_VALUE);
+        return expectedClaim;
+    }
+
     private void buildPerformableOperation() {
 
         redirectOperation = new PerformableOperation();
         redirectOperation.setOp(Operation.REDIRECT);
         redirectOperation.setUrl("http://redirect.url");
+    }
+
+    private static ClaimMapping buildClaimMapping(String claimUri) {
+
+        ClaimMapping claimMapping = new ClaimMapping();
+        Claim claim = new Claim();
+        claim.setClaimUri(claimUri);
+        claimMapping.setRemoteClaim(claim);
+        claimMapping.setLocalClaim(claim);
+        return claimMapping;
     }
 }
