@@ -193,8 +193,7 @@ public class AuthenticatedUserBuilder {
             } else if (ROLES_CLAIM.equals(claim.getUri())) {
                 DiagnosticLogger.logSuccessResponseDataValidationError(new AuthenticationActionExecutionResult(
                         "claims/" + ROLES_CLAIM, Availability.AVAILABLE, Validity.INVALID,
-                        "Currently we are not supporting role management with the custom authenticator, " +
-                                "hence ignoring role claim."));
+                        "Currently setting roles for the authenticated user is not allowed."));
                 continue;
             }
             userAttributes.put(buildClaimMapping(claim.getUri()), claim.getValueAsString());
