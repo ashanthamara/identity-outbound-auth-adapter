@@ -37,6 +37,7 @@ public class TestAuthenticationAdapterConstants {
         public static final String USER_MULTI_CLAIM_VALUE = "value1, value2";
         public static final String ADDRESS = "5th Avenue, New York, USA";
         public static final String SEPARATOR = ",";
+        public static final String ADDRESS_CLAIM = "http://wso2.org/claims/addresses";
     }
 
 }

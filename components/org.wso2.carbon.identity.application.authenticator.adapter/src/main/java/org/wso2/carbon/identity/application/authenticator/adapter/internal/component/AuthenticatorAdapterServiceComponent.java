@@ -35,6 +35,7 @@ import org.wso2.carbon.identity.application.authenticator.adapter.internal.Authe
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.AuthenticationRequestBuilder;
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.AuthenticationResponseProcessor;
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.UserDefinedAuthenticatorServiceImpl;
+import org.wso2.carbon.identity.claim.metadata.mgt.ClaimMetadataManagementService;
 import org.wso2.carbon.identity.organization.management.service.OrganizationManager;
 import org.wso2.carbon.user.core.service.RealmService;
 
@@ -125,5 +126,23 @@ public class AuthenticatorAdapterServiceComponent {
 
         log.debug("Unregistering the Realm Service in AuthenticatorAdapterServiceComponent.");
         AuthenticatorAdapterDataHolder.getInstance().setRealmService(null);
+    }
+
+    @Reference(
+            name = "claim.metadata.management.service",
+            service = org.wso2.carbon.identity.claim.metadata.mgt.ClaimMetadataManagementService.class,
+            cardinality = ReferenceCardinality.MANDATORY,
+            policy = ReferencePolicy.DYNAMIC,
+            unbind = "unsetClaimMetadataManagementService")
+    protected void setClaimMetadataManagementService(ClaimMetadataManagementService claimManagementService) {
+
+        AuthenticatorAdapterDataHolder.getInstance().setClaimManagementService(claimManagementService);
+        log.debug("ClaimMetadataManagementService set in AuthenticatorAdapterServiceComponent.");
+    }
+
+    protected void unsetClaimMetadataManagementService(ClaimMetadataManagementService claimManagementService) {
+
+        AuthenticatorAdapterDataHolder.getInstance().setClaimManagementService(null);
+        log.debug("ClaimMetadataManagementService unset in AuthenticatorAdapterServiceComponent.");
     }
 }

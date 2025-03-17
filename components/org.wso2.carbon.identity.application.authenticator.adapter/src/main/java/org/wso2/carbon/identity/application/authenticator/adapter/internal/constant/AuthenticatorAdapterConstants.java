@@ -25,11 +25,10 @@ public class AuthenticatorAdapterConstants {
 
     public static final String AUTHENTICATOR_NAME = "AbstractAuthenticatorAdapter";
     public static final String WSO2_CLAIM_DIALECT = "http://wso2.org/claims";
-    public static final String EXTERNAL_ID_CLAIM = "http://wso2.org/claims/externalID";
+    public static final String EXTERNAL_ID_CLAIM = "http://wso2.org/claims/externalid";
     public static final String USERNAME_CLAIM = "http://wso2.org/claims/username";
     public static final String GROUP_CLAIM = "http://wso2.org/claims/groups";
     public static final String ROLES_CLAIM = "http://wso2.org/claims/roles";
-    public static final String ADDRESS_CLAIM = "http://wso2.org/claims/addresses";
     public static final String AUTH_REQUEST = "authenticationRequest";
     public static final String AUTH_RESPONSE = "authenticationResponse";
     public static final String AUTH_CONTEXT = "authContext";
@@ -39,6 +38,7 @@ public class AuthenticatorAdapterConstants {
     public static final String LOCAL_IDP = "LOCAL";
     public static final String FED_IDP = "FEDERATED";
     public static final String EXECUTION_STATUS_PROP_NAME = "actionExecutionStatus";
+    public static final String MULTI_VALUED_PROPERTY = "multiValued";
 
     public static final String DEFAULT_USER_STORE_CONFIG_PATH = "Actions.Types.Authentication.DefaultUserStore";
 
