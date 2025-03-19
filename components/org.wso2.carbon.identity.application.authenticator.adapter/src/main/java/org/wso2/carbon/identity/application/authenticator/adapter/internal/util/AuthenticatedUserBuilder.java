@@ -33,6 +33,10 @@ import org.wso2.carbon.identity.application.authenticator.adapter.internal.model
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.model.AuthenticationActionExecutionResult.Validity;
 import org.wso2.carbon.identity.application.common.model.Claim;
 import org.wso2.carbon.identity.application.common.model.ClaimMapping;
+import org.wso2.carbon.identity.claim.metadata.mgt.ClaimMetadataManagementService;
+import org.wso2.carbon.identity.claim.metadata.mgt.exception.ClaimMetadataException;
+import org.wso2.carbon.identity.claim.metadata.mgt.model.LocalClaim;
+import org.wso2.carbon.identity.claim.metadata.mgt.util.ClaimConstants;
 import org.wso2.carbon.identity.core.util.IdentityConfigParser;
 import org.wso2.carbon.identity.core.util.IdentityTenantUtil;
 import org.wso2.carbon.user.api.UserStoreException;
@@ -45,9 +49,9 @@ import org.wso2.carbon.user.core.util.UserCoreUtil;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.wso2.carbon.identity.application.authentication.framework.util.FrameworkConstants.LOCAL;
-import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.ADDRESS_CLAIM;
 import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.DEFAULT_USER_STORE_CONFIG_PATH;
 import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.EXTERNAL_ID_CLAIM;
 import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.GROUP_CLAIM;
@@ -186,7 +190,6 @@ public class AuthenticatedUserBuilder {
 
         Map<ClaimMapping, String> userAttributes = new HashMap<>();
         for (AuthenticatedUserData.Claim claim : userFromResponse.getUser().getClaims()) {
-            validateClaimValue(claim.getUri(), claim.getValue());
             if (GROUP_CLAIM.equals(claim.getUri())) {
                 ignoreGroupsInClaimsInResponse();
                 continue;
@@ -196,6 +199,8 @@ public class AuthenticatedUserBuilder {
                         "Currently setting roles for the authenticated user is not allowed."));
                 continue;
             }
+            Optional<LocalClaim> localClaim = getLocalClaim(claim.getUri(), context.getTenantDomain());
+            validateClaimValue(localClaim, claim.getUri(), claim.getValue());
             userAttributes.put(buildClaimMapping(claim.getUri()), claim.getValueAsString());
             if (USERNAME_CLAIM.equals(claim.getUri())) {
                 usernameFromResponse = claim.getValueAsString();
@@ -204,51 +209,59 @@ public class AuthenticatedUserBuilder {
         return userAttributes;
     }
 
-    private void validateClaimValue(String claimUri, Object claimValue)
+    private void validateClaimValue(Optional<LocalClaim> localClaim, String claimKey, Object claimValue)
             throws ActionExecutionResponseProcessorException {
 
-        if (ADDRESS_CLAIM.equals(claimUri)) {
-            /* The ADDRESS claim is not validated for multi-value separator characters since it is internally treated
-             as a single-valued claim. */
-            return;
+        if (!localClaim.isPresent()) {
+            throw new ActionExecutionResponseProcessorException("Claim not found for claim URI: " + claimKey);
         }
 
-        if (claimValue instanceof List) {
-            for (String value : (List<String>) claimValue) {
-                validateIfValueContainsMultiAttributeSeparator(value);
+        if (Boolean.parseBoolean(localClaim.get().getClaimProperty(ClaimConstants.MULTI_VALUED_PROPERTY))) {
+            if (claimValue instanceof List) {
+                String multiAttributeSeparator = FrameworkUtils.getMultiAttributeSeparator();
+                for (String value : (List<String>) claimValue) {
+                    if (StringUtils.contains(value, multiAttributeSeparator)) {
+                        String errorMessage = String.format("The character %s is not allowed in claim values, as it " +
+                                        "is used internally to separate multiple values.", multiAttributeSeparator);
+                        DiagnosticLogger.logSuccessResponseDataValidationError(new AuthenticationActionExecutionResult(
+                                "claims/" + claimKey, Availability.AVAILABLE, Validity.INVALID, errorMessage));
+                        throw new ActionExecutionResponseProcessorException(errorMessage);
+                    }
+                }
+                return;
             }
-        } else {
-            validateIfValueContainsMultiAttributeSeparator((String) claimValue);
-        }
-    }
 
-    private void validateIfValueContainsMultiAttributeSeparator(String value)
-            throws ActionExecutionResponseProcessorException {
-
-        if (StringUtils.contains(value, FrameworkUtils.getMultiAttributeSeparator())) {
-            String errorMessage = String.format("The character %s is not allowed in claim values, as it is " +
-                    "used internally to separate multiple values.", FrameworkUtils.getMultiAttributeSeparator());
+            String errorMessage = String.format("The claim value for the multi-valued attribute claim " + claimKey +
+                    " must be a list of values.");
             DiagnosticLogger.logSuccessResponseDataValidationError(new AuthenticationActionExecutionResult(
-                    "claims", Availability.AVAILABLE, Validity.INVALID, errorMessage));
+                    "claims/" + claimKey, Availability.AVAILABLE, Validity.INVALID, errorMessage));
             throw new ActionExecutionResponseProcessorException(errorMessage);
+        } else {
+            if (!(claimValue instanceof String)) {
+                String errorMessage = "The claim value for the single-valued attribute claim " + claimKey +
+                        " must be a single value.";
+                DiagnosticLogger.logSuccessResponseDataValidationError(new AuthenticationActionExecutionResult(
+                        "claims/" + claimKey, Availability.AVAILABLE, Validity.INVALID, errorMessage));
+                throw new ActionExecutionResponseProcessorException(errorMessage);
+            }
         }
     }
 
     private void resolveGroupsForFederatedUser(Map<ClaimMapping, String> claimMappings)
             throws ActionExecutionResponseProcessorException {
 
+        String multiAttributeSeparator = FrameworkUtils.getMultiAttributeSeparator();
         List<String> groupsFromResponse = userFromResponse.getUser().getGroups();
         if (groupsFromResponse != null) {
             if (groupsFromResponse.stream().anyMatch(
-                    groupName -> groupName.contains(FrameworkUtils.getMultiAttributeSeparator()))) {
+                    groupName -> groupName.contains(multiAttributeSeparator))) {
                 String errorMessage = String.format("The character %s is not allowed in names of groups, as it is " +
-                        "used internally to separate multiple groups.", FrameworkUtils.getMultiAttributeSeparator());
+                        "used internally to separate multiple groups.", multiAttributeSeparator);
                 DiagnosticLogger.logSuccessResponseDataValidationError(new AuthenticationActionExecutionResult(
                         "groups", Availability.AVAILABLE, Validity.INVALID, errorMessage));
                 throw new ActionExecutionResponseProcessorException(errorMessage);
             }
-            claimMappings.put(buildClaimMapping(GROUP_CLAIM), String.join(
-                    FrameworkUtils.getMultiAttributeSeparator(), groupsFromResponse));
+            claimMappings.put(buildClaimMapping(GROUP_CLAIM), String.join(multiAttributeSeparator, groupsFromResponse));
         }
     }
 
@@ -348,5 +361,19 @@ public class AuthenticatedUserBuilder {
     private String getDefaultUserStore() {
 
         return (String) IdentityConfigParser.getInstance().getConfiguration().get(DEFAULT_USER_STORE_CONFIG_PATH);
+    }
+
+    private static Optional<LocalClaim> getLocalClaim(String claimKey, String tenantDomain) throws
+            ActionExecutionResponseProcessorException {
+
+        ClaimMetadataManagementService claimMetadataManagementService =
+                AuthenticatorAdapterDataHolder.getInstance().getClaimManagementService();
+
+        try {
+            return claimMetadataManagementService.getLocalClaim(claimKey, tenantDomain);
+        } catch (ClaimMetadataException e) {
+            throw new ActionExecutionResponseProcessorException(
+                    "Error while retrieving claim metadata for claim URI: " + claimKey, e);
+        }
     }
 }

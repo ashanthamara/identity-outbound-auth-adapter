@@ -19,6 +19,7 @@
 package org.wso2.carbon.identity.application.authenticator.adapter.internal.component;
 
 import org.wso2.carbon.identity.action.execution.api.service.ActionExecutorService;
+import org.wso2.carbon.identity.claim.metadata.mgt.ClaimMetadataManagementService;
 import org.wso2.carbon.identity.organization.management.service.OrganizationManager;
 import org.wso2.carbon.user.core.service.RealmService;
 
@@ -31,6 +32,7 @@ public class AuthenticatorAdapterDataHolder {
     private ActionExecutorService actionExecutorService;
     private OrganizationManager organizationManager;
     private RealmService realmService;
+    private ClaimMetadataManagementService claimManagementService;
 
     private AuthenticatorAdapterDataHolder() {
 
@@ -99,5 +101,25 @@ public class AuthenticatorAdapterDataHolder {
     public void setRealmService(RealmService realmService) {
 
         this.realmService = realmService;
+    }
+
+    /**
+     * Get the ClaimMetadataManagementService.
+     *
+     * @return ClaimMetadataManagementService instance.
+     */
+    public ClaimMetadataManagementService getClaimManagementService() {
+
+        return claimManagementService;
+    }
+
+    /**
+     * Set the ClaimMetadataManagementService.
+     *
+     * @param claimManagementService ClaimMetadataManagementService instance.
+     */
+    public void setClaimManagementService(ClaimMetadataManagementService claimManagementService) {
+
+        this.claimManagementService = claimManagementService;
     }
 }

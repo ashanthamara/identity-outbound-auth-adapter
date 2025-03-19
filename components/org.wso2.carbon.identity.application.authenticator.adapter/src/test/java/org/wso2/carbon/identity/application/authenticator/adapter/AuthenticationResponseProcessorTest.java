@@ -52,6 +52,7 @@ import org.wso2.carbon.identity.application.authenticator.adapter.internal.Authe
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.component.AuthenticatorAdapterDataHolder;
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants;
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.model.AuthenticatedUserData;
+import org.wso2.carbon.identity.application.authenticator.adapter.util.MockServiceBuilder;
 import org.wso2.carbon.identity.application.authenticator.adapter.util.TestActionInvocationResponseBuilder;
 import org.wso2.carbon.identity.application.authenticator.adapter.util.TestActionInvocationResponseBuilder.ExternallyAuthenticatedUser;
 import org.wso2.carbon.identity.application.authenticator.adapter.util.TestAuthenticatedTestUserBuilder;
@@ -88,8 +89,10 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.wso2.carbon.base.MultitenantConstants.SUPER_TENANT_DOMAIN_NAME;
-import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.ADDRESS_CLAIM;
 import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.DEFAULT_USER_STORE_CONFIG_PATH;
+import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.USERNAME_CLAIM;
+import static org.wso2.carbon.identity.application.authenticator.adapter.util.TestAuthenticationAdapterConstants.AuthenticatingUserConstants.ADDRESS_CLAIM;
+import static org.wso2.carbon.identity.application.authenticator.adapter.util.TestAuthenticationAdapterConstants.AuthenticatingUserConstants.USER_MULTI_VALUE_CLAIM_URI;
 
 public class AuthenticationResponseProcessorTest {
 
@@ -485,12 +488,13 @@ public class AuthenticationResponseProcessorTest {
 
         ExternallyAuthenticatedUser authUserWithInvalidMultiValueClaims = new ExternallyAuthenticatedUser();
         authUserWithInvalidMultiValueClaims.setClaims(new ArrayList<>(
-                List.of(new AuthenticatedUserData.Claim("claim1", "value1, value2"))));
+                List.of(new AuthenticatedUserData.Claim(USER_MULTI_VALUE_CLAIM_URI, "value1"))));
         ActionExecutionResponseContext<ActionInvocationSuccessResponse> authSuccessResponseWithInvalidMultiValueClaims =
                 TestActionInvocationResponseBuilder.buildAuthenticationSuccessResponse(
                         new ArrayList<>(), new AuthenticatedUserData(authUserWithInvalidMultiValueClaims));
         String errorMessageForInvalidMultiValueClaims =
-                "The character , is not allowed in claim values, as it is used internally to separate multiple values.";
+                "The claim value for the multi-valued attribute claim http://wso2.org/claims/multiValueUri " +
+                        "must be a list of values.";
 
 
         return new Object[][] {
@@ -614,6 +618,11 @@ public class AuthenticationResponseProcessorTest {
 
         when(mockedUserRealm.getUserStoreManager()).thenReturn(mockedUserStoreManager);
         when(mockedUserStoreManager.getSecondaryUserStoreManager(anyString())).thenReturn(abstractUserStoreManager);
+
+        List<ClaimMapping> allClaims = new ArrayList<>(expectedUserClaims().keySet());
+        allClaims.add(buildClaimMapping(USERNAME_CLAIM));
+        AuthenticatorAdapterDataHolder.getInstance().setClaimManagementService(
+                MockServiceBuilder.mockClaimMetadataManagementService(allClaims, TENANT_DOMAIN_TEST));
     }
 
     private void createExpectedAuthenticatedUsers() throws Exception {

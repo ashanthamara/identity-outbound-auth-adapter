@@ -18,21 +18,25 @@
 
 package org.wso2.carbon.identity.application.authenticator.adapter.internal.model;
 
-import org.apache.commons.lang3.StringUtils;
+import org.wso2.carbon.identity.action.execution.api.exception.ActionExecutionRequestBuilderException;
 import org.wso2.carbon.identity.action.execution.api.model.User;
 import org.wso2.carbon.identity.action.execution.api.model.UserClaim;
 import org.wso2.carbon.identity.application.authentication.framework.model.AuthenticatedUser;
 import org.wso2.carbon.identity.application.authentication.framework.util.FrameworkUtils;
+import org.wso2.carbon.identity.application.authenticator.adapter.internal.component.AuthenticatorAdapterDataHolder;
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants;
 import org.wso2.carbon.identity.application.common.model.ClaimMapping;
+import org.wso2.carbon.identity.claim.metadata.mgt.ClaimMetadataManagementService;
+import org.wso2.carbon.identity.claim.metadata.mgt.exception.ClaimMetadataException;
+import org.wso2.carbon.identity.claim.metadata.mgt.model.LocalClaim;
+import org.wso2.carbon.identity.claim.metadata.mgt.util.ClaimConstants;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Pattern;
-
-import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.ADDRESS_CLAIM;
 
 /**
  * This class holds the authenticated user object which is communicated to the external authentication service.
@@ -42,7 +46,7 @@ public class AuthenticatingUser extends User {
     private String userIdentitySource;
     private String sub;
 
-    public AuthenticatingUser(String id, AuthenticatedUser user) {
+    public AuthenticatingUser(String id, AuthenticatedUser user) throws ActionExecutionRequestBuilderException {
 
         super(buildUser(id, user));
         sub = user.getAuthenticatedSubjectIdentifier();
@@ -50,7 +54,8 @@ public class AuthenticatingUser extends User {
                 AuthenticatorAdapterConstants.FED_IDP : AuthenticatorAdapterConstants.LOCAL_IDP;
     }
 
-    private static User.Builder buildUser(String id, AuthenticatedUser user) {
+    private static User.Builder buildUser(String id, AuthenticatedUser user) throws
+            ActionExecutionRequestBuilderException {
 
         User.Builder userBuilder = new User.Builder(id);
         String multiAttributeSeparator = FrameworkUtils.getMultiAttributeSeparator();
@@ -70,7 +75,7 @@ public class AuthenticatingUser extends User {
                 }
 
                 String claimValue = entry.getValue();
-                if (isMultiValuedAttribute(claimUri, claimValue, multiAttributeSeparator)) {
+                if (isMultiValuedAttribute(claimUri, user.getTenantDomain())) {
                     String[] attributeValues = claimValue.split(Pattern.quote(multiAttributeSeparator));
                     userClaimList.add(new UserClaim(claimUri, attributeValues));
                     continue;
@@ -99,13 +104,22 @@ public class AuthenticatingUser extends User {
         return sub;
     }
 
-    private static boolean isMultiValuedAttribute(String claimKey, String claimValue, String multiAttributeSeparator) {
+    private static boolean isMultiValuedAttribute(String claimKey, String tenantDomain) throws
+            ActionExecutionRequestBuilderException {
 
-        // Address claim contains multi attribute separator but its not a multi valued attribute.
-        if (claimKey.equals(ADDRESS_CLAIM)) {
-            return false;
+        ClaimMetadataManagementService claimMetadataManagementService =
+                AuthenticatorAdapterDataHolder.getInstance().getClaimManagementService();
+
+        try {
+            Optional<LocalClaim> localClaim = claimMetadataManagementService.getLocalClaim(claimKey, tenantDomain);
+            if (!localClaim.isPresent()) {
+                throw new ActionExecutionRequestBuilderException("Claim not found for claim URI: " + claimKey);
+            }
+            return Boolean.parseBoolean(localClaim.get().getClaimProperty(ClaimConstants.MULTI_VALUED_PROPERTY));
+        } catch (ClaimMetadataException e) {
+            throw new ActionExecutionRequestBuilderException(
+                    "Error while retrieving claim metadata for claim URI: " + claimKey, e);
         }
-        return StringUtils.contains(claimValue, multiAttributeSeparator);
     }
 }
 
