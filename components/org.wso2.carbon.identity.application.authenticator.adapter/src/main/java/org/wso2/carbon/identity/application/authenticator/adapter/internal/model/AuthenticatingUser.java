@@ -29,6 +29,7 @@ import org.wso2.carbon.identity.application.common.model.ClaimMapping;
 import org.wso2.carbon.identity.claim.metadata.mgt.ClaimMetadataManagementService;
 import org.wso2.carbon.identity.claim.metadata.mgt.exception.ClaimMetadataException;
 import org.wso2.carbon.identity.claim.metadata.mgt.model.LocalClaim;
+import org.wso2.carbon.identity.claim.metadata.mgt.util.ClaimConstants;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -36,8 +37,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
-
-import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.MULTI_VALUED_PROPERTY;
 
 /**
  * This class holds the authenticated user object which is communicated to the external authentication service.
@@ -116,7 +115,7 @@ public class AuthenticatingUser extends User {
             if (!localClaim.isPresent()) {
                 throw new ActionExecutionRequestBuilderException("Claim not found for claim URI: " + claimKey);
             }
-            return Boolean.parseBoolean(localClaim.get().getClaimProperty(MULTI_VALUED_PROPERTY));
+            return Boolean.parseBoolean(localClaim.get().getClaimProperty(ClaimConstants.MULTI_VALUED_PROPERTY));
         } catch (ClaimMetadataException e) {
             throw new ActionExecutionRequestBuilderException(
                     "Error while retrieving claim metadata for claim URI: " + claimKey, e);
