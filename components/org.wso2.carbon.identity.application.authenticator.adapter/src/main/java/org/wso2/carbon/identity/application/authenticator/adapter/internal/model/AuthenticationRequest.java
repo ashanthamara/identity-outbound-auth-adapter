@@ -33,7 +33,7 @@ import javax.servlet.http.HttpServletRequest;
  */
 public class AuthenticationRequest extends Request {
 
-    public AuthenticationRequest(Builder builder) {
+    private AuthenticationRequest(Builder builder) {
 
         additionalHeaders.addAll(builder.additionalHeaders);
         additionalParams.addAll(builder.additionalParams);
