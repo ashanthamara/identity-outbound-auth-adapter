@@ -178,8 +178,9 @@ public class TestFlowContextBuilder {
         Enumeration<String> parameterEnumeration = Collections.enumeration(parameters.keySet());
         when(request.getHeaderNames()).thenReturn(headerEnumeration);
         when(request.getParameterNames()).thenReturn(parameterEnumeration);
-        headers.forEach((key, value) -> when(request.getHeader(key)).thenReturn(value));
-        parameters.forEach((key, value) -> when(request.getParameter(key)).thenReturn(value));
+        headers.forEach((key, value) -> when(request.getHeaders(key))
+                .thenReturn(Collections.enumeration(Collections.singletonList(value))));
+        parameters.forEach((key, value) -> when(request.getParameterValues(key)).thenReturn(new String[]{value}));
         return request;
     }
 }

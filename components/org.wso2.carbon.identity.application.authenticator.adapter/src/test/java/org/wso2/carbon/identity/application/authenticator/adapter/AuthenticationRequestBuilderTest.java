@@ -31,8 +31,11 @@ import org.wso2.carbon.identity.action.execution.api.model.AllowedOperation;
 import org.wso2.carbon.identity.action.execution.api.model.Application;
 import org.wso2.carbon.identity.action.execution.api.model.Event;
 import org.wso2.carbon.identity.action.execution.api.model.FlowContext;
+import org.wso2.carbon.identity.action.execution.api.model.Header;
 import org.wso2.carbon.identity.action.execution.api.model.Operation;
 import org.wso2.carbon.identity.action.execution.api.model.Organization;
+import org.wso2.carbon.identity.action.execution.api.model.Param;
+import org.wso2.carbon.identity.action.execution.api.model.Request;
 import org.wso2.carbon.identity.action.execution.api.model.Tenant;
 import org.wso2.carbon.identity.action.execution.api.model.UserClaim;
 import org.wso2.carbon.identity.application.authentication.framework.context.AuthHistory;
@@ -42,6 +45,7 @@ import org.wso2.carbon.identity.application.authenticator.adapter.internal.Authe
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.component.AuthenticatorAdapterDataHolder;
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants;
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.model.AuthenticatingUser;
+import org.wso2.carbon.identity.application.authenticator.adapter.internal.model.AuthenticationRequest;
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.model.AuthenticationRequestEvent;
 import org.wso2.carbon.identity.application.authenticator.adapter.util.MockServiceBuilder;
 import org.wso2.carbon.identity.application.authenticator.adapter.util.TestAuthenticatedTestUserBuilder;
@@ -58,6 +62,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -76,6 +81,9 @@ public class AuthenticationRequestBuilderTest {
     private MockedStatic<FrameworkUtils> frameworkUtils;
     private MockedStatic<LoggerUtils> loggerUtils;
     private MockedStatic<OrganizationManagementUtil> organizationManagementUtil;
+    private AuthenticatedUser localUser;
+    private AuthenticatedUser fedUser;
+    private AuthenticatedUser userWithMultiValueClaims;
     private static ClaimMetadataManagementService claimMetadataManagementService;
     private static final String SEPARATOR = ",";
 
@@ -123,6 +131,14 @@ public class AuthenticationRequestBuilderTest {
         AuthenticatorAdapterDataHolder.getInstance().setClaimManagementService(
                 MockServiceBuilder.mockClaimMetadataManagementService(
                         new ArrayList<>(userAttributes.keySet()), TENANT_DOMAIN_TEST));
+
+        localUser = TestAuthenticatedTestUserBuilder
+                .createAuthenticatedUser(AuthenticatedUserConstants.LOCAL_USER_PREFIX, SUPER_TENANT_DOMAIN_NAME);
+        fedUser = TestAuthenticatedTestUserBuilder
+                .createAuthenticatedUser(AuthenticatedUserConstants.LOCAL_USER_PREFIX, SUPER_TENANT_DOMAIN_NAME);
+        userWithMultiValueClaims = TestAuthenticatedTestUserBuilder
+                .createAuthenticatedUser(AuthenticatedUserConstants.LOCAL_USER_PREFIX, SUPER_TENANT_DOMAIN_NAME);
+        userWithMultiValueClaims.setUserAttributes(userAttributes);
     }
 
     @AfterClass
@@ -143,39 +159,33 @@ public class AuthenticationRequestBuilderTest {
     @DataProvider
     public Object[][] flowContextDataProvider() throws Exception {
 
-        // Custom authenticator engaging in 1st step of authentication flow.
-        FlowContext flowContextForNoUser = new TestFlowContextBuilder().buildFlowContext(
-                 null, SUPER_TENANT_DOMAIN_NAME, headers, parameters, new ArrayList<>());
-
-        // Custom authenticator engaging in 2nd step of authentication flow with Local authenticated user.
-        AuthenticatedUser localUser = TestAuthenticatedTestUserBuilder.createAuthenticatedUser(
-                AuthenticatedUserConstants.LOCAL_USER_PREFIX, SUPER_TENANT_DOMAIN_NAME);
-        FlowContext flowContextForLocalUser = new TestFlowContextBuilder().buildFlowContext(
-                localUser, SUPER_TENANT_DOMAIN_NAME, headers, parameters, authHistory);
-
-        // Custom authenticator engaging in 2nd step of authentication flow with federated authenticated user.
-        AuthenticatedUser fedUser = TestAuthenticatedTestUserBuilder.createAuthenticatedUser(
-                AuthenticatedUserConstants.LOCAL_USER_PREFIX, SUPER_TENANT_DOMAIN_NAME);
-        FlowContext flowContextForFedUser = new TestFlowContextBuilder().buildFlowContext(
-                fedUser, SUPER_TENANT_DOMAIN_NAME, headers, parameters, authHistory);
-
-        // Custom authenticator engaging in 2nd step of authentication flow with multi-value claims.
-        AuthenticatedUser userWithMultiValueClaims = TestAuthenticatedTestUserBuilder.createAuthenticatedUser(
-                AuthenticatedUserConstants.LOCAL_USER_PREFIX, SUPER_TENANT_DOMAIN_NAME);
-        userWithMultiValueClaims.setUserAttributes(userAttributes);
-        FlowContext flowContextForUserWithMultiValueClaims = new TestFlowContextBuilder().buildFlowContext(
-                userWithMultiValueClaims, SUPER_TENANT_DOMAIN_NAME, headers, parameters, authHistory);
         AuthenticationRequestEvent expectedEventWithMultiValueClaims =
                 getExpectedEvent(userWithMultiValueClaims, false);
 
         return new Object[][]{
-                {flowContextForNoUser, getExpectedEvent(null, true), true},
-                {flowContextForNoUser, getExpectedEvent(null, false), false},
-                {flowContextForLocalUser, getExpectedEvent(localUser, true), true},
-                {flowContextForLocalUser, getExpectedEvent(localUser, false), false},
-                {flowContextForFedUser, getExpectedEvent(fedUser, true), true},
-                {flowContextForFedUser, getExpectedEvent(fedUser, false), false},
-                {flowContextForUserWithMultiValueClaims, expectedEventWithMultiValueClaims, false}};
+                // Custom authenticator engaging in 1st step of authentication flow.
+                {getFlowContextForNoUser(), getExpectedEvent(null, true), true},
+                {getFlowContextForNoUser(), getExpectedEvent(null, false), false},
+                // Custom authenticator engaging in 2nd step of authentication flow with Local authenticated user.
+                {getFlowContextForUser(localUser), getExpectedEvent(localUser, true), true},
+                {getFlowContextForUser(localUser), getExpectedEvent(localUser, false), false},
+                // Custom authenticator engaging in 2nd step of authentication flow with federated authenticated user.
+                {getFlowContextForUser(fedUser), getExpectedEvent(fedUser, true), true},
+                {getFlowContextForUser(fedUser), getExpectedEvent(fedUser, false), false},
+                // Custom authenticator engaging in 2nd step of authentication flow with multi-value claims.
+                {getFlowContextForUser(userWithMultiValueClaims), expectedEventWithMultiValueClaims, false}};
+    }
+
+    private FlowContext getFlowContextForNoUser() {
+
+        return new TestFlowContextBuilder().buildFlowContext(
+                null, SUPER_TENANT_DOMAIN_NAME, headers, parameters, new ArrayList<>());
+    }
+
+    private FlowContext getFlowContextForUser(AuthenticatedUser user) {
+
+        return new TestFlowContextBuilder().buildFlowContext(
+                user, SUPER_TENANT_DOMAIN_NAME, headers, parameters, authHistory);
     }
 
     @Test(dataProvider = "flowContextDataProvider")
@@ -199,7 +209,7 @@ public class AuthenticationRequestBuilderTest {
         Assert.assertTrue(actualEvent instanceof AuthenticationRequestEvent);
         AuthenticationRequestEvent actualAuthenticationEvent = (AuthenticationRequestEvent) actualEvent;
 
-        Assert.assertNull(actualAuthenticationEvent.getRequest());
+        assertRequest(actualAuthenticationEvent.getRequest(), expectedEvent.getRequest());
         Assert.assertEquals(actualAuthenticationEvent.getTenant().getId(), expectedEvent.getTenant().getId());
         Assert.assertEquals(actualAuthenticationEvent.getApplication().getId(), expectedEvent.getApplication().getId());
         Assert.assertEquals(actualAuthenticationEvent.getApplication().getName(),
@@ -246,6 +256,34 @@ public class AuthenticationRequestBuilderTest {
         Assert.assertEquals(actualAuthenticationEvent.getAuthenticatedSteps().length, authHistory.size());
     }
 
+    private void assertRequest(Request actualRequest, Request expectedRequest) {
+
+        Assert.assertTrue(actualRequest instanceof AuthenticationRequest);
+        AuthenticationRequest actualAuthRequest = (AuthenticationRequest) actualRequest;
+
+        Assert.assertEquals(actualAuthRequest.getAdditionalHeaders().size(), this.headers.size());
+        Assert.assertEquals(actualAuthRequest.getAdditionalParams().size(), this.parameters.size());
+        for (Header expectedHeader : expectedRequest.getAdditionalHeaders()) {
+            Header actualHeader = actualAuthRequest.getAdditionalHeaders().stream()
+                    .filter(h -> h.getName().equals(expectedHeader.getName()))
+                    .findFirst().orElse(null);
+
+            Assert.assertNotNull(actualHeader);
+            Assert.assertEquals(actualHeader.getValue().length, expectedHeader.getValue().length);
+            Assert.assertEquals(actualHeader.getValue()[0], expectedHeader.getValue()[0]);
+        }
+
+        for (Param expectedParam : expectedRequest.getAdditionalParams()) {
+            Param actualParam = actualAuthRequest.getAdditionalParams().stream()
+                    .filter(p -> p.getName().equals(expectedParam.getName()))
+                    .findFirst().orElse(null);
+
+            Assert.assertNotNull(actualParam);
+            Assert.assertEquals(actualParam.getValue().length, expectedParam.getValue().length);
+            Assert.assertEquals(actualParam.getValue()[0], expectedParam.getValue()[0]);
+        }
+    }
+
     private void assertAllowedOperations(List<AllowedOperation> allowedOperationList) {
 
         Assert.assertEquals(allowedOperationList.size(), 1);
@@ -264,6 +302,14 @@ public class AuthenticationRequestBuilderTest {
         if (user != null) {
             eventBuilder.user(createAuthenticatingUser(user));
         }
+        eventBuilder.request(new AuthenticationRequest.Builder()
+                .additionalHeaders(this.headers.entrySet().stream()
+                        .map(e -> new Header(e.getKey(), new String[]{e.getValue()}))
+                        .collect(Collectors.toList()))
+                .additionalParams(this.parameters.entrySet().stream()
+                        .map(e -> new Param(e.getKey(), new String[]{e.getValue()}))
+                        .collect(Collectors.toList()))
+                .build());
 
         return eventBuilder.build();
     }
