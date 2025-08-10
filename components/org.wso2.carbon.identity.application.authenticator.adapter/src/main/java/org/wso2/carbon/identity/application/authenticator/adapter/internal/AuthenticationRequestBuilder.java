@@ -30,6 +30,7 @@ import org.wso2.carbon.identity.action.execution.api.model.Event;
 import org.wso2.carbon.identity.action.execution.api.model.FlowContext;
 import org.wso2.carbon.identity.action.execution.api.model.Operation;
 import org.wso2.carbon.identity.action.execution.api.model.Organization;
+import org.wso2.carbon.identity.action.execution.api.model.Request;
 import org.wso2.carbon.identity.action.execution.api.model.Tenant;
 import org.wso2.carbon.identity.action.execution.api.model.User;
 import org.wso2.carbon.identity.action.execution.api.model.UserStore;
@@ -41,6 +42,7 @@ import org.wso2.carbon.identity.application.authentication.framework.model.Authe
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.component.AuthenticatorAdapterDataHolder;
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants;
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.model.AuthenticatingUser;
+import org.wso2.carbon.identity.application.authenticator.adapter.internal.model.AuthenticationRequest;
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.model.AuthenticationRequestEvent;
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.model.AuthenticationRequestEvent.AuthenticatedStep;
 import org.wso2.carbon.identity.core.util.IdentityTenantUtil;
@@ -51,6 +53,8 @@ import org.wso2.carbon.identity.organization.management.service.util.Organizatio
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+
+import javax.servlet.http.HttpServletRequest;
 
 /**
  * This is a builder class which is responsible for building authentication request payload which will be sent to the
@@ -74,19 +78,22 @@ public class AuthenticationRequestBuilder implements ActionExecutionRequestBuild
                                                               ActionExecutionRequestContext actionExecutionContext)
             throws ActionExecutionRequestBuilderException {
 
+        HttpServletRequest request = flowContext.getValue(
+                AuthenticatorAdapterConstants.AUTH_REQUEST, HttpServletRequest.class);
         AuthenticationContext context = flowContext.getValue(
                 AuthenticatorAdapterConstants.AUTH_CONTEXT, AuthenticationContext.class);
 
         ActionExecutionRequest.Builder actionRequestBuilder = new ActionExecutionRequest.Builder();
         actionRequestBuilder.flowId(context.getContextIdentifier());
         actionRequestBuilder.actionType(getSupportedActionType());
-        actionRequestBuilder.event(getEvent(context));
+        actionRequestBuilder.event(getEvent(request, context));
         actionRequestBuilder.allowedOperations(getAllowedOperations());
 
         return actionRequestBuilder.build();
     }
 
-    private Event getEvent(AuthenticationContext context) throws ActionExecutionRequestBuilderException {
+    private Event getEvent(HttpServletRequest request, AuthenticationContext context)
+            throws ActionExecutionRequestBuilderException {
 
         AuthenticatedUser currentAuthenticatedUser = context.getLastAuthenticatedUser();
 
@@ -100,6 +107,7 @@ public class AuthenticationRequestBuilder implements ActionExecutionRequestBuild
                 context.getServiceProviderName()));
         eventBuilder.currentStepIndex(context.getCurrentStep());
         eventBuilder.authenticatedSteps(getAuthenticatedStepsForEventBuilder(context));
+        eventBuilder.request(getRequest(request));
         return eventBuilder.build();
     }
 
@@ -158,5 +166,16 @@ public class AuthenticationRequestBuilder implements ActionExecutionRequestBuild
         AllowedOperation operation = new AllowedOperation();
         operation.setOp(Operation.REDIRECT);
         return Collections.singletonList(operation);
+    }
+
+    private Request getRequest(HttpServletRequest httpServletRequest) {
+
+        if (httpServletRequest == null) {
+            LOG.debug("HttpServletRequest is null. Additional headers and parameters will not be added to the " +
+                    "authentication request.");
+            return null;
+        }
+
+        return new AuthenticationRequest.Builder().fromHttpRequest(httpServletRequest).build();
     }
 }
