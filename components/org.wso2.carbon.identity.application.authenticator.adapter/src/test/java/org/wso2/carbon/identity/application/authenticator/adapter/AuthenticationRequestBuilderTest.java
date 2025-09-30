@@ -21,10 +21,10 @@ package org.wso2.carbon.identity.application.authenticator.adapter;
 import org.mockito.MockedStatic;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
-import org.wso2.carbon.identity.action.execution.api.exception.ActionExecutionRequestBuilderException;
 import org.wso2.carbon.identity.action.execution.api.model.ActionExecutionRequest;
 import org.wso2.carbon.identity.action.execution.api.model.ActionType;
 import org.wso2.carbon.identity.action.execution.api.model.AllowedOperation;
@@ -53,9 +53,12 @@ import org.wso2.carbon.identity.application.authenticator.adapter.util.TestFlowC
 import org.wso2.carbon.identity.application.common.model.Claim;
 import org.wso2.carbon.identity.application.common.model.ClaimMapping;
 import org.wso2.carbon.identity.central.log.mgt.utils.LoggerUtils;
-import org.wso2.carbon.identity.claim.metadata.mgt.ClaimMetadataManagementService;
+import org.wso2.carbon.identity.common.testng.WithCarbonHome;
+import org.wso2.carbon.identity.core.context.IdentityContext;
+import org.wso2.carbon.identity.core.context.model.RootOrganization;
 import org.wso2.carbon.identity.core.util.IdentityTenantUtil;
 import org.wso2.carbon.identity.organization.management.service.OrganizationManager;
+import org.wso2.carbon.identity.organization.management.service.model.MinimalOrganization;
 import org.wso2.carbon.identity.organization.management.service.util.OrganizationManagementUtil;
 
 import java.util.ArrayList;
@@ -74,6 +77,7 @@ import static org.wso2.carbon.identity.application.authenticator.adapter.interna
 import static org.wso2.carbon.identity.application.authenticator.adapter.util.TestAuthenticatedTestUserBuilder.AuthenticatedUserConstants;
 import static org.wso2.carbon.identity.application.authenticator.adapter.util.TestAuthenticationAdapterConstants.AuthenticatingUserConstants.ADDRESS_CLAIM;
 
+@WithCarbonHome
 public class AuthenticationRequestBuilderTest {
 
     private AuthenticationRequestBuilder authenticationRequestBuilder;
@@ -81,16 +85,19 @@ public class AuthenticationRequestBuilderTest {
     private MockedStatic<FrameworkUtils> frameworkUtils;
     private MockedStatic<LoggerUtils> loggerUtils;
     private MockedStatic<OrganizationManagementUtil> organizationManagementUtil;
+    private OrganizationManager organizationManager;
     private AuthenticatedUser localUser;
     private AuthenticatedUser fedUser;
     private AuthenticatedUser userWithMultiValueClaims;
-    private static ClaimMetadataManagementService claimMetadataManagementService;
     private static final String SEPARATOR = ",";
 
+    private static final String ROOT_ORG_ID_TEST = "10084a8d-113f-4211-a0d5-efe36b082211";
     private static final String TENANT_DOMAIN_TEST = "carbon.super";
     private static final int TENANT_ID_TEST = -1234;
     private static final String ORG_NAME_TEST = "subOrg";
-    private static final String ORG_ID_TEST = "12345";
+    private static final String ORG_HANDLE_TEST = "subOrg.com";
+    private static final String ORG_ID_TEST = "550e8400-e29b-41d4-a716-446655440000";
+    private static final int ORG_DEPTH_TEST = 1;
     private static final String USER_CLAIM_URI = WSO2_CLAIM_DIALECT + "/customUri";
     private static final String USER_CLAIM_VALUE = "customValue";
     private static final String USER_MULTI_VALUE_CLAIM_URI = WSO2_CLAIM_DIALECT + "/multiValueUri";
@@ -107,9 +114,7 @@ public class AuthenticationRequestBuilderTest {
 
         authHistory = TestFlowContextBuilder.buildAuthHistory();
 
-        OrganizationManager organizationManager = mock(OrganizationManager.class);
-        when(organizationManager.resolveOrganizationId(anyString())).thenReturn(ORG_ID_TEST);
-        when(organizationManager.getOrganizationNameById(anyString())).thenReturn(ORG_NAME_TEST);
+        organizationManager = mock(OrganizationManager.class);
         AuthenticatorAdapterDataHolder.getInstance().setOrganizationManager(organizationManager);
 
         identityTenantUtilMockedStatic = mockStatic(IdentityTenantUtil.class);
@@ -119,12 +124,9 @@ public class AuthenticationRequestBuilderTest {
         frameworkUtils.when(FrameworkUtils::getMultiAttributeSeparator).thenReturn(SEPARATOR);
 
         organizationManagementUtil = mockStatic(OrganizationManagementUtil.class);
-        organizationManagementUtil.when(() ->
-                        OrganizationManagementUtil.getRootOrgTenantDomainBySubOrgTenantDomain(anyString()))
-                .thenReturn(TENANT_DOMAIN_TEST);
 
         loggerUtils = mockStatic(LoggerUtils.class);
-        loggerUtils.when(() -> LoggerUtils.isDiagnosticLogsEnabled()).thenReturn(true);
+        loggerUtils.when(LoggerUtils::isDiagnosticLogsEnabled).thenReturn(true);
 
         authenticationRequestBuilder = new AuthenticationRequestBuilder();
         userAttributes = buildUserAttributes();
@@ -150,50 +152,129 @@ public class AuthenticationRequestBuilderTest {
         loggerUtils.close();
     }
 
+    @AfterMethod
+    public void end() {
+
+        IdentityContext.destroyCurrentContext();
+    }
+
     @Test
     public void testGetSupportedActionType() {
 
         Assert.assertEquals(authenticationRequestBuilder.getSupportedActionType(), ActionType.AUTHENTICATION);
     }
 
-    @DataProvider
-    public Object[][] flowContextDataProvider() throws Exception {
+    private FlowContext getFlowContextForNoUser(String tenantDomain) {
 
-        AuthenticationRequestEvent expectedEventWithMultiValueClaims =
-                getExpectedEvent(userWithMultiValueClaims, false);
+        return new TestFlowContextBuilder().buildFlowContext(
+                null, tenantDomain, headers, parameters, new ArrayList<>());
+    }
+
+    private FlowContext getFlowContextForUser(AuthenticatedUser user, String tenantDomain) {
+
+        return new TestFlowContextBuilder().buildFlowContext(
+                user, tenantDomain, headers, parameters, authHistory);
+    }
+
+    @DataProvider
+    public Object[][] requestBuilderDataProvider() {
 
         return new Object[][]{
                 // Custom authenticator engaging in 1st step of authentication flow.
-                {getFlowContextForNoUser(), getExpectedEvent(null, true), true},
-                {getFlowContextForNoUser(), getExpectedEvent(null, false), false},
+                {getFlowContextForNoUser(TENANT_DOMAIN_TEST), null},
                 // Custom authenticator engaging in 2nd step of authentication flow with Local authenticated user.
-                {getFlowContextForUser(localUser), getExpectedEvent(localUser, true), true},
-                {getFlowContextForUser(localUser), getExpectedEvent(localUser, false), false},
+                {getFlowContextForUser(localUser, TENANT_DOMAIN_TEST), localUser},
                 // Custom authenticator engaging in 2nd step of authentication flow with federated authenticated user.
-                {getFlowContextForUser(fedUser), getExpectedEvent(fedUser, true), true},
-                {getFlowContextForUser(fedUser), getExpectedEvent(fedUser, false), false},
+                {getFlowContextForUser(fedUser, TENANT_DOMAIN_TEST), fedUser},
                 // Custom authenticator engaging in 2nd step of authentication flow with multi-value claims.
-                {getFlowContextForUser(userWithMultiValueClaims), expectedEventWithMultiValueClaims, false}};
+                {getFlowContextForUser(userWithMultiValueClaims, TENANT_DOMAIN_TEST), userWithMultiValueClaims}};
     }
 
-    private FlowContext getFlowContextForNoUser() {
+    @Test(dataProvider = "requestBuilderDataProvider")
+    public void testBuildActionExecutionRequest(FlowContext flowContext, AuthenticatedUser user) throws Exception {
 
-        return new TestFlowContextBuilder().buildFlowContext(
-                null, SUPER_TENANT_DOMAIN_NAME, headers, parameters, new ArrayList<>());
+        AuthenticationRequestEvent expectedEvent = getExpectedEvent(user, false);
+        IdentityContext.getThreadLocalIdentityContext().setRootOrganization(new RootOrganization.Builder()
+                .organizationId(ROOT_ORG_ID_TEST)
+                .associatedTenantDomain(TENANT_DOMAIN_TEST)
+                .associatedTenantId(TENANT_ID_TEST)
+                .build());
+        IdentityContext.getThreadLocalIdentityContext().setOrganization(
+                new org.wso2.carbon.identity.core.context.model.Organization.Builder()
+                    .id(ROOT_ORG_ID_TEST)
+                    .name(TENANT_DOMAIN_TEST)
+                    .organizationHandle(TENANT_DOMAIN_TEST)
+                    .depth(0)
+                    .build());
+
+        ActionExecutionRequest actionExecutionRequest =
+                authenticationRequestBuilder.buildActionExecutionRequest(flowContext, null);
+        Assert.assertNotNull(actionExecutionRequest);
+        Assert.assertEquals(actionExecutionRequest.getFlowId(), TestFlowContextBuilder.FLOW_ID);
+        Assert.assertEquals(actionExecutionRequest.getActionType(), ActionType.AUTHENTICATION);
+        assertEvent(actionExecutionRequest.getEvent(), expectedEvent);
+        assertAllowedOperations(actionExecutionRequest.getAllowedOperations());
     }
 
-    private FlowContext getFlowContextForUser(AuthenticatedUser user) {
+    @DataProvider
+    public Object[][] requestBuilderSubOrgDataProvider() {
 
-        return new TestFlowContextBuilder().buildFlowContext(
-                user, SUPER_TENANT_DOMAIN_NAME, headers, parameters, authHistory);
+        return new Object[][]{
+                // Custom authenticator engaging in 1st step of authentication flow.
+                {getFlowContextForNoUser(ORG_HANDLE_TEST), null},
+                // Custom authenticator engaging in 2nd step of authentication flow with Local authenticated user.
+                {getFlowContextForUser(localUser, ORG_HANDLE_TEST), localUser},
+                // Custom authenticator engaging in 2nd step of authentication flow with federated authenticated user.
+                {getFlowContextForUser(fedUser, ORG_HANDLE_TEST), fedUser},
+                // Custom authenticator engaging in 2nd step of authentication flow with multi-value claims.
+                {getFlowContextForUser(userWithMultiValueClaims, ORG_HANDLE_TEST), userWithMultiValueClaims}};
     }
 
-    @Test(dataProvider = "flowContextDataProvider")
-    public void testBuildActionExecutionRequest(FlowContext flowContext, AuthenticationRequestEvent expectedEvent,
-                                                boolean isSubOrgFlow) throws ActionExecutionRequestBuilderException {
+    @Test(dataProvider = "requestBuilderSubOrgDataProvider")
+    public void testBuildActionExecutionRequestForSubOrg(FlowContext flowContext, AuthenticatedUser user)
+            throws Exception {
 
-        organizationManagementUtil.when(() -> OrganizationManagementUtil.isOrganization(anyString()))
-                .thenReturn(isSubOrgFlow);
+        AuthenticationRequestEvent expectedEvent = getExpectedEvent(user, true);
+        IdentityContext.getThreadLocalIdentityContext().setRootOrganization(new RootOrganization.Builder()
+                .organizationId(ROOT_ORG_ID_TEST)
+                .associatedTenantDomain(TENANT_DOMAIN_TEST)
+                .associatedTenantId(TENANT_ID_TEST)
+                .build());
+        IdentityContext.getThreadLocalIdentityContext().setOrganization(
+                new org.wso2.carbon.identity.core.context.model.Organization.Builder()
+                        .id(ORG_ID_TEST)
+                        .name(ORG_NAME_TEST)
+                        .organizationHandle(ORG_HANDLE_TEST)
+                        .depth(ORG_DEPTH_TEST)
+                        .build());
+
+        ActionExecutionRequest actionExecutionRequest =
+                authenticationRequestBuilder.buildActionExecutionRequest(flowContext, null);
+        Assert.assertNotNull(actionExecutionRequest);
+        Assert.assertEquals(actionExecutionRequest.getFlowId(), TestFlowContextBuilder.FLOW_ID);
+        Assert.assertEquals(actionExecutionRequest.getActionType(), ActionType.AUTHENTICATION);
+        assertEvent(actionExecutionRequest.getEvent(), expectedEvent);
+        assertAllowedOperations(actionExecutionRequest.getAllowedOperations());
+    }
+
+
+    @Test(dataProvider = "requestBuilderSubOrgDataProvider")
+    public void testBuildActionExecutionRequestWithResolvingOrgInternally(FlowContext flowContext,
+                                                                          AuthenticatedUser user) throws Exception {
+
+        AuthenticationRequestEvent expectedEvent = getExpectedEvent(user, true);
+        when(organizationManager.resolveOrganizationId(anyString())).thenReturn(ORG_ID_TEST);
+        when(organizationManager.getMinimalOrganization(anyString(), anyString())).thenReturn(
+                new MinimalOrganization.Builder()
+                        .id(ORG_ID_TEST)
+                        .name(ORG_NAME_TEST)
+                        .organizationHandle(ORG_HANDLE_TEST)
+                        .depth(ORG_DEPTH_TEST)
+                        .build());
+        when(organizationManager.getOrganizationNameById(anyString())).thenReturn(ORG_NAME_TEST);
+        organizationManagementUtil.when(() ->
+                        OrganizationManagementUtil.getRootOrgTenantDomainBySubOrgTenantDomain(anyString()))
+                .thenReturn(TENANT_DOMAIN_TEST);
 
         ActionExecutionRequest actionExecutionRequest =
                 authenticationRequestBuilder.buildActionExecutionRequest(flowContext, null);
@@ -297,7 +378,19 @@ public class AuthenticationRequestBuilderTest {
         eventBuilder.tenant(new Tenant(String.valueOf(TENANT_ID_TEST), TENANT_DOMAIN_TEST));
         eventBuilder.application(new Application(TestFlowContextBuilder.SP_ID, TestFlowContextBuilder.SP_NAME));
         if (isSubOrgFlow) {
-            eventBuilder.organization(new Organization(ORG_ID_TEST, ORG_NAME_TEST));
+            eventBuilder.organization(new Organization.Builder()
+                    .id(ORG_ID_TEST)
+                    .name(ORG_NAME_TEST)
+                    .orgHandle(ORG_HANDLE_TEST)
+                    .depth(ORG_DEPTH_TEST)
+                    .build());
+        } else {
+            eventBuilder.organization(new Organization.Builder()
+                    .id(ROOT_ORG_ID_TEST)
+                    .name(TENANT_DOMAIN_TEST)
+                    .orgHandle(TENANT_DOMAIN_TEST)
+                    .depth(0)
+                    .build());
         }
         if (user != null) {
             eventBuilder.user(createAuthenticatingUser(user));
