@@ -156,8 +156,7 @@ public class AuthenticationRequestBuilder implements ActionExecutionRequestBuild
                     .build());
 
             if (minimalOrg.getDepth() > 0) {
-                // If the depth is greater than 0, it is a sub-organization.
-                // Hence, need to resolve the root tenant domain.
+                // If the depth is greater than 0, it is a sub-organization. Resolving the root tenant domain.
                 tenantDomain = OrganizationManagementUtil.getRootOrgTenantDomainBySubOrgTenantDomain(tenantDomain);
             }
             eventBuilder.tenant(new Tenant(String.valueOf(IdentityTenantUtil.getTenantId(tenantDomain)), tenantDomain));
