@@ -326,14 +326,14 @@
         </identity.application.auth.adapter.package.export.version>
 
         <servlet-api.version>2.5</servlet-api.version>
-        <carbon.identity.framework.version>7.8.74</carbon.identity.framework.version>
+        <carbon.identity.framework.version>7.8.335</carbon.identity.framework.version>
         <testng.version>7.10.1</testng.version>
         <maven.surefire.plugin.version>2.22.2</maven.surefire.plugin.version>
         <mockito.version>5.3.1</mockito.version>
         <mockito-testng.version>0.5.2</mockito-testng.version>
         <maven.buildnumber.plugin.version>1.4</maven.buildnumber.plugin.version>
-        <identity.organization.management.core.version>1.1.24</identity.organization.management.core.version>
-        <carbon.kernel.version>4.10.10</carbon.kernel.version>
+        <identity.organization.management.core.version>1.1.46</identity.organization.management.core.version>
+        <carbon.kernel.version>4.10.33</carbon.kernel.version>
         <junit.version>4.13.1</junit.version>
         <com.fasterxml.jackson.version>2.16.1</com.fasterxml.jackson.version>
 

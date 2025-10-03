@@ -18,6 +18,7 @@
 
 package org.wso2.carbon.identity.application.authenticator.adapter.internal;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.wso2.carbon.identity.action.execution.api.exception.ActionExecutionRequestBuilderException;
@@ -45,9 +46,12 @@ import org.wso2.carbon.identity.application.authenticator.adapter.internal.model
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.model.AuthenticationRequest;
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.model.AuthenticationRequestEvent;
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.model.AuthenticationRequestEvent.AuthenticatedStep;
+import org.wso2.carbon.identity.core.context.IdentityContext;
+import org.wso2.carbon.identity.core.context.model.RootOrganization;
 import org.wso2.carbon.identity.core.util.IdentityTenantUtil;
 import org.wso2.carbon.identity.organization.management.service.OrganizationManager;
 import org.wso2.carbon.identity.organization.management.service.exception.OrganizationManagementException;
+import org.wso2.carbon.identity.organization.management.service.model.MinimalOrganization;
 import org.wso2.carbon.identity.organization.management.service.util.OrganizationManagementUtil;
 
 import java.util.ArrayList;
@@ -126,27 +130,67 @@ public class AuthenticationRequestBuilder implements ActionExecutionRequestBuild
             throws ActionExecutionRequestBuilderException {
 
         String tenantDomain = context.getTenantDomain();
+        Tenant tenant = getTenantFromIdentityContext();
+        Organization organization = getOrganizationFromIdentityContext();
 
+        if (tenant != null && organization != null && StringUtils.equals(tenantDomain, organization.getOrgHandle())) {
+            eventBuilder.tenant(tenant);
+            eventBuilder.organization(organization);
+            return;
+        }
+
+        // Fallback logic to resolve tenant and organization information when not available in the identity context.
         try {
-            /* Only if the user is attempting to log in to a sub-organization, the organization will be set,
-             and also the root tenant will be considered the tenant domain. */
-            if (OrganizationManagementUtil.isOrganization(tenantDomain)) {
-                String orgId = organizationManager.resolveOrganizationId(tenantDomain);
-                eventBuilder.organization(new Organization(
-                        orgId,
-                        organizationManager.getOrganizationNameById(orgId)
-                ));
-                tenantDomain = OrganizationManagementUtil.getRootOrgTenantDomainBySubOrgTenantDomain(orgId);
+            String orgId = organizationManager.resolveOrganizationId(tenantDomain);
+            MinimalOrganization minimalOrg = organizationManager.getMinimalOrganization(orgId, tenantDomain);
+            if (minimalOrg == null) {
+                throw new ActionExecutionRequestBuilderException(
+                        "Unable to find organization information for the tenant: " + tenantDomain);
             }
+
+            eventBuilder.organization(new Organization.Builder()
+                    .id(minimalOrg.getId())
+                    .name(minimalOrg.getName())
+                    .orgHandle(minimalOrg.getOrganizationHandle())
+                    .depth(minimalOrg.getDepth())
+                    .build());
+
+            if (minimalOrg.getDepth() > 0) {
+                // If the depth is greater than 0, it is a sub-organization. Resolving the root tenant domain.
+                tenantDomain = OrganizationManagementUtil.getRootOrgTenantDomainBySubOrgTenantDomain(tenantDomain);
+            }
+            eventBuilder.tenant(new Tenant(String.valueOf(IdentityTenantUtil.getTenantId(tenantDomain)), tenantDomain));
         } catch (OrganizationManagementException e) {
             throw new ActionExecutionRequestBuilderException(String.format("Error occurred while retrieving " +
                     "organization details for the tenant %s in authentication context.", tenantDomain), e);
         }
+    }
 
-        eventBuilder.tenant(new Tenant(
-                String.valueOf(IdentityTenantUtil.getTenantId(tenantDomain)),
-                tenantDomain
-        ));
+    private Tenant getTenantFromIdentityContext() {
+
+        RootOrganization rootOrganization = IdentityContext.getThreadLocalIdentityContext().getRootOrganization();
+        if (rootOrganization == null) {
+            return null;
+        }
+
+        return new Tenant(String.valueOf(rootOrganization.getAssociatedTenantId()),
+                rootOrganization.getAssociatedTenantDomain());
+    }
+
+    private Organization getOrganizationFromIdentityContext() {
+
+        org.wso2.carbon.identity.core.context.model.Organization organization =
+                IdentityContext.getThreadLocalIdentityContext().getOrganization();
+        if (organization == null) {
+            return null;
+        }
+
+        return new Organization.Builder()
+                .id(organization.getId())
+                .name(organization.getName())
+                .orgHandle(organization.getOrganizationHandle())
+                .depth(organization.getDepth())
+                .build();
     }
 
     private AuthenticatedStep[] getAuthenticatedStepsForEventBuilder(AuthenticationContext context) {
