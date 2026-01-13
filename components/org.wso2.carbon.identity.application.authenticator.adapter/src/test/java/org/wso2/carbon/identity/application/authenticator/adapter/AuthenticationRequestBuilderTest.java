@@ -106,7 +106,8 @@ public class AuthenticationRequestBuilderTest {
     private static final String ADDRESS = "5th Avenue, New York, USA";
     private static Map<ClaimMapping, String> userAttributes;
     Map<String, String> headers = Map.of("header-1", "value-1", "header-2", "value-2");
-    Map<String, String> parameters = Map.of("param-1", "value-1", "param-2", "value-2");
+    Map<String, String> parametersFromRequest = Map.of("param-1", "value-1", "param-2", "value-2");
+    Map<String, String> parametersFromAuthorizeRequest = Map.of("testQuery", "123", "sample", "abc");
     ArrayList<AuthHistory> authHistory;
 
     @BeforeClass
@@ -167,13 +168,13 @@ public class AuthenticationRequestBuilderTest {
     private FlowContext getFlowContextForNoUser(String tenantDomain) {
 
         return new TestFlowContextBuilder().buildFlowContext(
-                null, tenantDomain, headers, parameters, new ArrayList<>());
+                null, tenantDomain, headers, parametersFromRequest, new ArrayList<>());
     }
 
     private FlowContext getFlowContextForUser(AuthenticatedUser user, String tenantDomain) {
 
         return new TestFlowContextBuilder().buildFlowContext(
-                user, tenantDomain, headers, parameters, authHistory);
+                user, tenantDomain, headers, parametersFromRequest, authHistory);
     }
 
     @DataProvider
@@ -343,7 +344,16 @@ public class AuthenticationRequestBuilderTest {
         AuthenticationRequest actualAuthRequest = (AuthenticationRequest) actualRequest;
 
         Assert.assertEquals(actualAuthRequest.getAdditionalHeaders().size(), this.headers.size());
-        Assert.assertEquals(actualAuthRequest.getAdditionalParams().size(), this.parameters.size());
+        Assert.assertEquals(actualAuthRequest.getAdditionalParams().size(),
+                this.parametersFromRequest.size() + this.parametersFromAuthorizeRequest.size());
+        for (Map.Entry<String, String> paramEntry : this.parametersFromAuthorizeRequest.entrySet()) {
+            Param actualParam = actualAuthRequest.getAdditionalParams().stream()
+                    .filter(p -> p.getName().equals(paramEntry.getKey()))
+                    .findFirst().orElse(null);
+
+            Assert.assertNotNull(actualParam);
+            Assert.assertEquals(actualParam.getValue()[0], paramEntry.getValue());
+        }
         for (Header expectedHeader : expectedRequest.getAdditionalHeaders()) {
             Header actualHeader = actualAuthRequest.getAdditionalHeaders().stream()
                     .filter(h -> h.getName().equals(expectedHeader.getName()))
@@ -399,7 +409,7 @@ public class AuthenticationRequestBuilderTest {
                 .additionalHeaders(this.headers.entrySet().stream()
                         .map(e -> new Header(e.getKey(), new String[]{e.getValue()}))
                         .collect(Collectors.toList()))
-                .additionalParams(this.parameters.entrySet().stream()
+                .additionalParams(this.parametersFromRequest.entrySet().stream()
                         .map(e -> new Param(e.getKey(), new String[]{e.getValue()}))
                         .collect(Collectors.toList()))
                 .build());

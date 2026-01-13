@@ -68,6 +68,26 @@ public class AuthenticationRequest extends Request {
             return this;
         }
 
+        /**
+         * Extract query parameters from the initial request query string.
+         *
+         * @param queryParamString Query parameter string from the initial request.
+         * @return Builder instance.
+         */
+        public Builder fromInitialAuthorizeRequest(String queryParamString) {
+
+            if (queryParamString != null && !queryParamString.isEmpty()) {
+                String[] paramPairs = queryParamString.split("&");
+                for (String pair : paramPairs) {
+                    String[] keyValue = pair.split("=");
+                    String key = keyValue[0];
+                    String value = keyValue.length > 1 ? keyValue[1] : "";
+                    this.additionalParams.add(new Param(key, new String[]{value}));
+                }
+            }
+            return this;
+        }
+
         public AuthenticationRequest build() {
 
             return new AuthenticationRequest(this);

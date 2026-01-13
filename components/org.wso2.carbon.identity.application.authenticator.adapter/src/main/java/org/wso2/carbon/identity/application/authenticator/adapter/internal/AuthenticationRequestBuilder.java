@@ -111,7 +111,7 @@ public class AuthenticationRequestBuilder implements ActionExecutionRequestBuild
                 context.getServiceProviderName()));
         eventBuilder.currentStepIndex(context.getCurrentStep());
         eventBuilder.authenticatedSteps(getAuthenticatedStepsForEventBuilder(context));
-        eventBuilder.request(getRequest(request));
+        eventBuilder.request(getRequest(request, context));
         return eventBuilder.build();
     }
 
@@ -212,7 +212,7 @@ public class AuthenticationRequestBuilder implements ActionExecutionRequestBuild
         return Collections.singletonList(operation);
     }
 
-    private Request getRequest(HttpServletRequest httpServletRequest) {
+    private Request getRequest(HttpServletRequest httpServletRequest, AuthenticationContext context) {
 
         if (httpServletRequest == null) {
             LOG.debug("HttpServletRequest is null. Additional headers and parameters will not be added to the " +
@@ -220,6 +220,9 @@ public class AuthenticationRequestBuilder implements ActionExecutionRequestBuild
             return null;
         }
 
-        return new AuthenticationRequest.Builder().fromHttpRequest(httpServletRequest).build();
+        return new AuthenticationRequest.Builder()
+                .fromHttpRequest(httpServletRequest)
+                .fromInitialAuthorizeRequest(context.getQueryParams())
+                .build();
     }
 }
