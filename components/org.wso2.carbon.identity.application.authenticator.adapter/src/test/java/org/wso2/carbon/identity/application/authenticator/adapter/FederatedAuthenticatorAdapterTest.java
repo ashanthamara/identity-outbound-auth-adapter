@@ -31,6 +31,8 @@ import org.wso2.carbon.identity.application.authentication.framework.config.mode
 import org.wso2.carbon.identity.application.authentication.framework.context.AuthHistory;
 import org.wso2.carbon.identity.application.authentication.framework.context.AuthenticationContext;
 import org.wso2.carbon.identity.application.authentication.framework.model.AuthenticatedUser;
+import org.wso2.carbon.identity.application.authentication.framework.model.AuthenticatorData;
+import org.wso2.carbon.identity.application.authentication.framework.util.FrameworkConstants;
 import org.wso2.carbon.identity.application.authenticator.adapter.api.UserDefinedFederatedAuthenticator;
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.component.AuthenticatorAdapterDataHolder;
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants;
@@ -42,6 +44,7 @@ import org.wso2.carbon.identity.application.common.model.UserDefinedFederatedAut
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Optional;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -50,6 +53,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.wso2.carbon.base.MultitenantConstants.SUPER_TENANT_DOMAIN_NAME;
+import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.ENDPOINT_URL_SUFFIX;
+import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.STATE_PARAM_SUFFIX;
 
 /**
  * Unit tests for UserDefinedFederatedAuthenticator.
@@ -57,6 +62,8 @@ import static org.wso2.carbon.base.MultitenantConstants.SUPER_TENANT_DOMAIN_NAME
 public class FederatedAuthenticatorAdapterTest {
 
     private static final String AUTHENTICATOR_NAME = "UserDefinedFederatedAuthenticator";
+    public static final String ENDPOINT_URL = "dummy-endpoint-url";
+    public static final String STATE_ID = "123";
     private UserDefinedFederatedAuthenticator userDefinedFederatedAuthenticator;
 
     private final HttpServletRequest request = mock(HttpServletRequest.class);
@@ -107,6 +114,30 @@ public class FederatedAuthenticatorAdapterTest {
 
         Assert.assertEquals(userDefinedFederatedAuthenticator.getClaimDialectURI(),
                 AuthenticatorAdapterConstants.WSO2_CLAIM_DIALECT);
+    }
+
+    @Test(dataProvider = "provideAuthenticationContext")
+    public void testGetAuthInitiationDataWithValidContext(AuthenticationContext context, int currentStep) {
+
+        context.setCurrentAuthenticator(AUTHENTICATOR_NAME);
+        context.setProperty(context.getCurrentAuthenticator() + ENDPOINT_URL_SUFFIX, ENDPOINT_URL);
+        context.setProperty(context.getCurrentAuthenticator() + STATE_PARAM_SUFFIX, STATE_ID);
+
+        Optional<AuthenticatorData> result = userDefinedFederatedAuthenticator.getAuthInitiationData(context);
+
+        Assert.assertTrue(result.isPresent(), "AuthenticatorData should be present");
+        AuthenticatorData data = result.get();
+
+        Assert.assertEquals(data.getName(), AUTHENTICATOR_NAME);
+        Assert.assertEquals(data.getDisplayName(), AUTHENTICATOR_NAME);
+        Assert.assertEquals(data.getIdp(), "testIdp");
+        Assert.assertEquals(data.getPromptType(), FrameworkConstants.AuthenticatorPromptType.INTERNAL_PROMPT);
+        Assert.assertNotNull(data.getI18nKey());
+        data.getAdditionalData().getAdditionalAuthenticationParams().forEach((key, value) -> {
+            if (key.equals(AUTHENTICATOR_NAME + ENDPOINT_URL_SUFFIX)) {
+                Assert.assertEquals(value, "AuthenticatorAdapterConstants.ENDPOINT_URL_VALUE");
+            }
+        });
     }
 
     @DataProvider
