@@ -40,6 +40,7 @@ import org.wso2.carbon.identity.application.authentication.framework.context.Aut
 import org.wso2.carbon.identity.application.authentication.framework.context.AuthenticationContext;
 import org.wso2.carbon.identity.application.authentication.framework.exception.UserIdNotFoundException;
 import org.wso2.carbon.identity.application.authentication.framework.model.AuthenticatedUser;
+import org.wso2.carbon.identity.application.authentication.framework.util.FrameworkUtils;
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.component.AuthenticatorAdapterDataHolder;
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants;
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.model.AuthenticatingUser;
@@ -57,8 +58,11 @@ import org.wso2.carbon.identity.organization.management.service.util.Organizatio
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 import javax.servlet.http.HttpServletRequest;
+
+import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.STATE_PARAM_SUFFIX;
 
 /**
  * This is a builder class which is responsible for building authentication request payload which will be sent to the
@@ -88,7 +92,7 @@ public class AuthenticationRequestBuilder implements ActionExecutionRequestBuild
                 AuthenticatorAdapterConstants.AUTH_CONTEXT, AuthenticationContext.class);
 
         ActionExecutionRequest.Builder actionRequestBuilder = new ActionExecutionRequest.Builder();
-        actionRequestBuilder.flowId(context.getContextIdentifier());
+        actionRequestBuilder.flowId(getFlowId(flowContext, context, request));
         actionRequestBuilder.actionType(getSupportedActionType());
         actionRequestBuilder.event(getEvent(request, context));
         actionRequestBuilder.allowedOperations(getAllowedOperations());
@@ -221,5 +225,23 @@ public class AuthenticationRequestBuilder implements ActionExecutionRequestBuild
         }
 
         return new AuthenticationRequest.Builder().fromHttpRequest(httpServletRequest).build();
+    }
+
+    private String getFlowId(FlowContext flowContext, AuthenticationContext context, HttpServletRequest request) {
+
+        /* If the authentication flow is not API-based, the session data key is used as the flow ID.
+        Otherwise, a randomly generated UUID is used. */
+        if (!FrameworkUtils.isAPIBasedAuthenticationFlow(request)) {
+            return context.getContextIdentifier();
+        }
+
+        String currentAuthenticator = flowContext.getValue(
+                AuthenticatorAdapterConstants.AUTHENTICATOR_NAME_PROP, String.class);
+        String stateId = (String) context.getProperty(currentAuthenticator + STATE_PARAM_SUFFIX);
+        if (StringUtils.isBlank(stateId)) {
+            stateId = UUID.randomUUID().toString();
+            context.setProperty(currentAuthenticator + STATE_PARAM_SUFFIX, stateId);
+        }
+        return stateId;
     }
 }

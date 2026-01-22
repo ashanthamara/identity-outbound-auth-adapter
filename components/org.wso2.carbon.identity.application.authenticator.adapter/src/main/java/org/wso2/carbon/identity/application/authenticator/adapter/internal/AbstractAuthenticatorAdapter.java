@@ -33,6 +33,8 @@ import org.wso2.carbon.identity.application.authentication.framework.context.Aut
 import org.wso2.carbon.identity.application.authentication.framework.exception.AuthenticationFailedException;
 import org.wso2.carbon.identity.application.authentication.framework.exception.InvalidCredentialsException;
 import org.wso2.carbon.identity.application.authentication.framework.exception.LogoutFailedException;
+import org.wso2.carbon.identity.application.authentication.framework.model.AdditionalData;
+import org.wso2.carbon.identity.application.authentication.framework.model.AuthenticatorData;
 import org.wso2.carbon.identity.application.authentication.framework.util.FrameworkConstants;
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.component.AuthenticatorAdapterDataHolder;
 import org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants;
@@ -40,6 +42,7 @@ import org.wso2.carbon.identity.application.common.model.Property;
 import org.wso2.carbon.identity.base.AuthenticatorPropertyConstants;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -48,6 +51,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import static org.wso2.carbon.identity.application.authentication.framework.util.FrameworkConstants.RequestParams.IS_IDF_INITIATED_FROM_AUTHENTICATOR;
+import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.ENDPOINT_URL_SUFFIX;
+import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.STATE_PARAM_SUFFIX;
 
 /**
  * This class holds the external custom authentication.
@@ -67,6 +72,28 @@ public abstract class AbstractAuthenticatorAdapter extends AbstractApplicationAu
     public boolean canHandle(HttpServletRequest request) {
 
         return true;
+    }
+
+    @Override
+    public boolean isAPIBasedAuthenticationSupported() {
+
+        return true;
+    }
+
+    @Override
+    public Optional<AuthenticatorData> getAuthInitiationData(AuthenticationContext context) {
+
+        AuthenticatorData authenticatorData = new AuthenticatorData();
+        authenticatorData.setName(getName());
+        authenticatorData.setDisplayName(getFriendlyName());
+        authenticatorData.setI18nKey(getI18nKey());
+        String idpName = context.getExternalIdP().getIdPName();
+        authenticatorData.setIdp(idpName);
+
+        authenticatorData.setPromptType(FrameworkConstants.AuthenticatorPromptType.INTERNAL_PROMPT);
+        authenticatorData.setAdditionalData(getAdditionalData(context));
+
+        return Optional.of(authenticatorData);
     }
 
     @Override
@@ -91,6 +118,7 @@ public abstract class AbstractAuthenticatorAdapter extends AbstractApplicationAu
             flowContext.add(AuthenticatorAdapterConstants.AUTH_RESPONSE, response);
             flowContext.add(AuthenticatorAdapterConstants.AUTH_CONTEXT, context);
             flowContext.add(AuthenticatorAdapterConstants.AUTH_TYPE, getAuthenticationType());
+            flowContext.add(AuthenticatorAdapterConstants.AUTHENTICATOR_NAME_PROP, getName());
 
             /* Execute the corresponding action from the authentication config and add the ActionExecutionStatus result
              to the context which will be used in processAuthenticationResponse method. */
@@ -225,5 +253,19 @@ public abstract class AbstractAuthenticatorAdapter extends AbstractApplicationAu
          processAuthenticationResponse method.*/
         context.setProperty(FrameworkConstants.AUTH_ERROR_CODE, errorCodeForClient);
         context.setProperty(FrameworkConstants.AUTH_ERROR_MSG, String.format(errorMessageForClient, getFriendlyName()));
+    }
+
+    private AdditionalData getAdditionalData(AuthenticationContext context) {
+
+        AdditionalData additionalData = new AdditionalData();
+
+        Map<String, String> additionalAuthenticationParams = new HashMap<>();
+        additionalAuthenticationParams.put(AuthenticatorAdapterConstants.PARAM_STATE,
+                (String) context.getProperty(getName() + STATE_PARAM_SUFFIX));
+        additionalAuthenticationParams.put(AuthenticatorAdapterConstants.PARAM_ENDPOINT_URL,
+                (String) context.getProperty(getName() + ENDPOINT_URL_SUFFIX));
+        additionalData.setAdditionalAuthenticationParams(additionalAuthenticationParams);
+
+        return additionalData;
     }
 }

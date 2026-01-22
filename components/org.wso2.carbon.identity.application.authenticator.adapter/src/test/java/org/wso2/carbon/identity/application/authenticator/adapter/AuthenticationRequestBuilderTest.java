@@ -67,6 +67,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import javax.servlet.http.HttpServletRequest;
+
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -89,6 +92,7 @@ public class AuthenticationRequestBuilderTest {
     private AuthenticatedUser localUser;
     private AuthenticatedUser fedUser;
     private AuthenticatedUser userWithMultiValueClaims;
+    private HttpServletRequest mockRequest;
     private static final String SEPARATOR = ",";
 
     private static final String ROOT_ORG_ID_TEST = "10084a8d-113f-4211-a0d5-efe36b082211";
@@ -155,6 +159,7 @@ public class AuthenticationRequestBuilderTest {
     @AfterMethod
     public void end() {
 
+        frameworkUtils.when(() -> FrameworkUtils.isAPIBasedAuthenticationFlow(any())).thenReturn(false);
         IdentityContext.destroyCurrentContext();
     }
 
@@ -166,14 +171,16 @@ public class AuthenticationRequestBuilderTest {
 
     private FlowContext getFlowContextForNoUser(String tenantDomain) {
 
+        mockRequest = TestFlowContextBuilder.buildAuthenticationRequest(headers, parameters);
         return new TestFlowContextBuilder().buildFlowContext(
-                null, tenantDomain, headers, parameters, new ArrayList<>());
+                null, tenantDomain, mockRequest, new ArrayList<>());
     }
 
     private FlowContext getFlowContextForUser(AuthenticatedUser user, String tenantDomain) {
 
+        mockRequest = TestFlowContextBuilder.buildAuthenticationRequest(headers, parameters);
         return new TestFlowContextBuilder().buildFlowContext(
-                user, tenantDomain, headers, parameters, authHistory);
+                user, tenantDomain, mockRequest, authHistory);
     }
 
     @DataProvider
@@ -280,6 +287,36 @@ public class AuthenticationRequestBuilderTest {
                 authenticationRequestBuilder.buildActionExecutionRequest(flowContext, null);
         Assert.assertNotNull(actionExecutionRequest);
         Assert.assertEquals(actionExecutionRequest.getFlowId(), TestFlowContextBuilder.FLOW_ID);
+        Assert.assertEquals(actionExecutionRequest.getActionType(), ActionType.AUTHENTICATION);
+        assertEvent(actionExecutionRequest.getEvent(), expectedEvent);
+        assertAllowedOperations(actionExecutionRequest.getAllowedOperations());
+    }
+
+    @Test(dataProvider = "requestBuilderDataProvider")
+    public void testBuildActionExecutionRequestWithAppNativeFlow(FlowContext flowContext,
+                                                                 AuthenticatedUser user) throws Exception {
+
+        AuthenticationRequestEvent expectedEvent = getExpectedEvent(user, true);
+        when(organizationManager.resolveOrganizationId(anyString())).thenReturn(ORG_ID_TEST);
+        when(organizationManager.getMinimalOrganization(anyString(), anyString())).thenReturn(
+                new MinimalOrganization.Builder()
+                        .id(ORG_ID_TEST)
+                        .name(ORG_NAME_TEST)
+                        .organizationHandle(ORG_HANDLE_TEST)
+                        .depth(ORG_DEPTH_TEST)
+                        .build());
+        when(organizationManager.getOrganizationNameById(anyString())).thenReturn(ORG_NAME_TEST);
+        organizationManagementUtil.when(() ->
+                        OrganizationManagementUtil.getRootOrgTenantDomainBySubOrgTenantDomain(anyString()))
+                .thenReturn(TENANT_DOMAIN_TEST);
+        frameworkUtils.when(() -> FrameworkUtils.isAPIBasedAuthenticationFlow(any())).thenReturn(true);
+
+        ActionExecutionRequest actionExecutionRequest =
+                authenticationRequestBuilder.buildActionExecutionRequest(flowContext, null);
+        Assert.assertNotNull(actionExecutionRequest);
+
+        // Flow id must be a new UUID generated internally for app native flows, not the sessionDataKey.
+        Assert.assertNotEquals(actionExecutionRequest.getFlowId(), TestFlowContextBuilder.FLOW_ID);
         Assert.assertEquals(actionExecutionRequest.getActionType(), ActionType.AUTHENTICATION);
         assertEvent(actionExecutionRequest.getEvent(), expectedEvent);
         assertAllowedOperations(actionExecutionRequest.getAllowedOperations());

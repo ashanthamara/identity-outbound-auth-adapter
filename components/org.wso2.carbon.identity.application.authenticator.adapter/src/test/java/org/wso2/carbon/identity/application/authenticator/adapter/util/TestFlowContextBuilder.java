@@ -64,6 +64,15 @@ public class TestFlowContextBuilder {
         return flowContext;
     }
 
+    public FlowContext buildFlowContext(AuthenticatedUser authenticatedUser, String tenantDomain,
+                                        HttpServletRequest request, ArrayList<AuthHistory> authHistory) {
+
+        flowContext.add(AuthenticatorAdapterConstants.AUTH_REQUEST, request);
+        flowContext.add(AuthenticatorAdapterConstants.AUTH_CONTEXT, buildAuthenticationContext(authenticatedUser,
+                tenantDomain, authHistory));
+        return flowContext;
+    }
+
     public FlowContext buildFlowContext(HttpServletRequest request, HttpServletResponse response,
                                         AuthenticationContext context,
                                         AuthenticatorPropertyConstants.AuthenticationType authenticationType) {
@@ -171,7 +180,8 @@ public class TestFlowContextBuilder {
      * @param parameters Parameters.
      * @return HttpServletRequest.
      */
-    public HttpServletRequest buildAuthenticationRequest(Map<String, String> headers, Map<String, String> parameters) {
+    public static HttpServletRequest buildAuthenticationRequest(
+            Map<String, String> headers, Map<String, String> parameters) {
 
         HttpServletRequest request = mock(HttpServletRequest.class);
         Enumeration<String> headerEnumeration = Collections.enumeration(headers.keySet());
