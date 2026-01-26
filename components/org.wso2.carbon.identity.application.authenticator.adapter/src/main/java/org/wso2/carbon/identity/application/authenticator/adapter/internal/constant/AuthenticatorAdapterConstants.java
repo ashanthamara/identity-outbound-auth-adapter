@@ -33,11 +33,16 @@ public class AuthenticatorAdapterConstants {
     public static final String AUTH_RESPONSE = "authenticationResponse";
     public static final String AUTH_CONTEXT = "authContext";
     public static final String AUTH_TYPE = "authenticatorType";
+    public static final String AUTHENTICATOR_NAME_PROP = "authenticatorName";
     public static final String FLOW_ID = "flowId";
     public static final String ACTION_ID_CONFIG = "actionId";;
     public static final String LOCAL_IDP = "LOCAL";
     public static final String FED_IDP = "FEDERATED";
     public static final String EXECUTION_STATUS_PROP_NAME = "actionExecutionStatus";
+    public static final String PARAM_STATE = "state";
+    public static final String PARAM_ENDPOINT_URL = "endpointUrl";
+    public static final String STATE_PARAM_SUFFIX = "_state_param";
+    public static final String ENDPOINT_URL_SUFFIX = "_endpointUrl_param";
 
     public static final String DEFAULT_USER_STORE_CONFIG_PATH = "Actions.Types.Authentication.DefaultUserStore";
 

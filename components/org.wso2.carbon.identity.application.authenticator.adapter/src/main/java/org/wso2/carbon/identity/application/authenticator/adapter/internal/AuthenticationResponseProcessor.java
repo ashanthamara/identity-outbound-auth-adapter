@@ -58,6 +58,8 @@ import java.util.List;
 
 import javax.servlet.http.HttpServletResponse;
 
+import static org.wso2.carbon.identity.application.authenticator.adapter.internal.constant.AuthenticatorAdapterConstants.ENDPOINT_URL_SUFFIX;
+
 /**
  * This is responsible for processing authentication response from the external authentication service.
  */
@@ -118,7 +120,13 @@ public class AuthenticationResponseProcessor implements ActionExecutionResponseP
 
         String url = operationsToPerform.get(0).getUrl();
         try {
-            response.sendRedirect(operationsToPerform.get(0).getUrl());
+            AuthenticationContext context = flowContext.getValue(
+                    AuthenticatorAdapterConstants.AUTH_CONTEXT, AuthenticationContext.class);
+            String currentAuthenticator =
+                    flowContext.getValue(AuthenticatorAdapterConstants.AUTHENTICATOR_NAME_PROP, String.class);
+            context.setProperty(currentAuthenticator + ENDPOINT_URL_SUFFIX, url);
+
+            response.sendRedirect(url);
             return new IncompleteStatus.Builder().responseContext(flowContext.getContextData()).build();
         } catch (IOException e) {
             throw new ActionExecutionResponseProcessorException(String.format(
