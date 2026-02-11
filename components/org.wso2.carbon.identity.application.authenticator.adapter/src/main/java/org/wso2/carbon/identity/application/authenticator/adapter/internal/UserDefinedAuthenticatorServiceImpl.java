@@ -18,6 +18,7 @@
 
 package org.wso2.carbon.identity.application.authenticator.adapter.internal;
 
+import org.osgi.annotation.bundle.Capability;
 import org.wso2.carbon.identity.application.authentication.framework.FederatedApplicationAuthenticator;
 import org.wso2.carbon.identity.application.authentication.framework.LocalApplicationAuthenticator;
 import org.wso2.carbon.identity.application.authentication.framework.UserDefinedAuthenticatorService;
@@ -30,6 +31,14 @@ import org.wso2.carbon.identity.application.common.model.UserDefinedLocalAuthent
  * This is the UserDefinedAuthenticatorService implementation class to create ApplicationAuthenticator instance
  * for the give application authenticator configuration.
  */
+@Capability(
+        namespace = "osgi.service",
+        attribute = {
+                "objectClass=org.wso2.carbon.identity.application.authentication.framework" +
+                        ".UserDefinedAuthenticatorService",
+                "service.scope=singleton"
+        }
+)
 public class UserDefinedAuthenticatorServiceImpl implements UserDefinedAuthenticatorService {
 
     /**

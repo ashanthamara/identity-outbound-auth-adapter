@@ -126,6 +126,14 @@
             <classifier>runtime</classifier>
             <version>${jacoco.version}</version>
         </dependency>
+        <dependency>
+            <groupId>org.eclipse.platform</groupId>
+            <artifactId>org.eclipse.osgi.services</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.platform</groupId>
+            <artifactId>org.eclipse.osgi</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
