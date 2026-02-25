@@ -157,6 +157,7 @@ public class TestFlowContextBuilder {
         authenticationContext.setAuthenticatorProperties(new HashMap<String, String>() {{
             put(AuthenticatorAdapterConstants.ACTION_ID_CONFIG, ACTION_ID);
         }});
+        authenticationContext.setQueryParams("testQuery=123&sample=abc");
         return authenticationContext;
     }
 
