@@ -213,7 +213,10 @@ public class AuthenticatedUserBuilder {
             throws ActionExecutionResponseProcessorException {
 
         if (!localClaim.isPresent()) {
-            throw new ActionExecutionResponseProcessorException("Claim not found for claim URI: " + claimKey);
+            String errorMessage = "Claim not found for claim URI: " + claimKey;
+            DiagnosticLogger.logSuccessResponseDataValidationError(new AuthenticationActionExecutionResult(
+                    "claims/" + claimKey, Availability.AVAILABLE, Validity.INVALID, errorMessage));
+            throw new ActionExecutionResponseProcessorException(errorMessage);
         }
 
         if (Boolean.parseBoolean(localClaim.get().getClaimProperty(ClaimConstants.MULTI_VALUED_PROPERTY))) {
